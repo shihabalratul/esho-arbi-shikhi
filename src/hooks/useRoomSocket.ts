@@ -23,6 +23,7 @@ export function useRoomSocket() {
   const mqttRelayRef = useRef<MqttRoomRelay | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
   const pingIntervalRef = useRef<number | null>(null);
+  const joinIntentRef = useRef<{ code: string; isExplicit: boolean } | null>(null);
 
   // Initialize MQTT Relay instance
   if (!mqttRelayRef.current) {
@@ -253,12 +254,146 @@ export function useRoomSocket() {
             applyIncomingState(state);
           },
           () => {
+            // Silently clean up stale room code without triggering error popup
             sessionStorage.removeItem('last_room_code');
           }
         );
       }
     });
   }, [roomState, applyIncomingState]);
+
+  // Robust multi-channel fallback join: HTTP REST API -> LocalStorage -> MQTT Cloud Relay
+  const attemptFallbackJoin = useCallback(
+    async (code: string, customName?: string, customColor?: string) => {
+      const cleanCode = code.trim().toUpperCase();
+      if (!cleanCode) return;
+      const activeName = customName || username || getStoredUsername() || 'শিক্ষার্থী';
+      const activeColor = customColor || avatarColor || getStoredAvatarColor();
+
+      // 1. Try REST API endpoint on the server (/api/rooms/:code)
+      try {
+        const res = await fetch(`/api/rooms/${cleanCode}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.exists && data.state) {
+            // Register join on server
+            fetch('/api/rooms/join', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomCode: cleanCode,
+                username: activeName,
+                avatarColor: activeColor,
+                clientId,
+              }),
+            }).catch(() => {});
+
+            applyIncomingState(data.state);
+            sessionStorage.setItem('last_room_code', cleanCode);
+            try {
+              localStorage.setItem(`esho_room_${cleanCode}`, JSON.stringify(data.state));
+            } catch {}
+            broadcastLocal({ type: 'SYNC_STATE', code: cleanCode, state: data.state });
+            mqttRelayRef.current?.subscribeToRoom(cleanCode).then(() => {
+              mqttRelayRef.current?.publishState(data.state);
+            });
+            setConnectionStatus('connected');
+            setErrorMessage(null);
+            return;
+          }
+        }
+      } catch {}
+
+      // 2. Check LocalStorage for recent room state
+      const saved = localStorage.getItem(`esho_room_${cleanCode}`);
+      if (saved) {
+        try {
+          const parsed: RoomState = JSON.parse(saved);
+          // Sync with server in background
+          fetch('/api/rooms/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: parsed }),
+          }).catch(() => {});
+
+          applyIncomingState(parsed);
+          sessionStorage.setItem('last_room_code', cleanCode);
+          setConnectionStatus('connected');
+          setErrorMessage(null);
+          return;
+        } catch {}
+      }
+
+      // 3. Fallback to MQTT Cloud Relay (works across separate networks and serverless deploys)
+      mqttRelayRef.current?.joinRoom(
+        cleanCode,
+        (foundState: RoomState) => {
+          const alreadyIn = foundState.participants.some((p) => p.id === clientId);
+          const updatedParticipants = alreadyIn
+            ? foundState.participants
+            : [
+                ...foundState.participants,
+                {
+                  id: clientId,
+                  username: activeName,
+                  avatarColor: activeColor,
+                  isHost: false,
+                  joinedAt: Date.now(),
+                },
+              ];
+
+          const updatedState: RoomState = {
+            ...foundState,
+            participants: updatedParticipants,
+            messages: alreadyIn
+              ? foundState.messages
+              : [
+                  ...foundState.messages,
+                  {
+                    id: `msg-${Date.now()}`,
+                    senderId: 'system',
+                    senderName: 'সিস্টেম',
+                    text: `${activeName} রুমে যুক্ত হয়েছেন`,
+                    type: 'system' as const,
+                    timestamp: Date.now(),
+                  },
+                ].slice(-50),
+          };
+
+          // Sync with server
+          fetch('/api/rooms/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: updatedState }),
+          }).catch(() => {});
+
+          applyIncomingState(updatedState);
+          sessionStorage.setItem('last_room_code', cleanCode);
+          try {
+            localStorage.setItem(`esho_room_${cleanCode}`, JSON.stringify(updatedState));
+          } catch {}
+          broadcastLocal({ type: 'SYNC_STATE', code: cleanCode, state: updatedState });
+          setIsFallbackMode(true);
+          setConnectionStatus('connected');
+          setErrorMessage(null);
+
+          // Publish state update to peer MQTT clients
+          mqttRelayRef.current?.publishState(updatedState);
+        },
+        () => {
+          // All layers exhausted, clean URL param to avoid refresh loop
+          if (typeof window !== 'undefined' && window.location.search.includes('room=')) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('room');
+            window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+          }
+          setConnectionStatus('connected');
+          showError(`রুম কোড "${cleanCode}" পাওয়া যায়নি। দয়া করে কোডটি পুনরায় চেক করুন।`);
+        }
+      );
+    },
+    [clientId, username, avatarColor, applyIncomingState, broadcastLocal, showError]
+  );
 
   const connect = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -306,9 +441,10 @@ export function useRoomSocket() {
           }
         }, 15000);
 
-        // If we were previously in a room, re-join seamlessly
+        // If we were previously in a room, re-join seamlessly (background attempt)
         const lastRoom = sessionStorage.getItem('last_room_code');
         if (lastRoom) {
+          joinIntentRef.current = { code: lastRoom, isExplicit: false };
           socket.send(
             JSON.stringify({
               type: 'JOIN_ROOM',
@@ -329,8 +465,12 @@ export function useRoomSocket() {
           }
 
           if (data.type === 'ROOM_CREATED' || data.type === 'ROOM_JOINED') {
+            joinIntentRef.current = null;
             setRoomState(data.state);
             sessionStorage.setItem('last_room_code', data.code);
+            try {
+              localStorage.setItem(`esho_room_${data.code}`, JSON.stringify(data.state));
+            } catch {}
             setErrorMessage(null);
             mqttRelayRef.current?.subscribeToRoom(data.code).then(() => {
               mqttRelayRef.current?.publishState(data.state);
@@ -361,11 +501,24 @@ export function useRoomSocket() {
           }
 
           if (data.type === 'ERROR') {
-            showError(data.message || 'একটি ত্রুটি ঘটেছে');
             if (data.code === 'ROOM_NOT_FOUND') {
+              const intent = joinIntentRef.current;
+              joinIntentRef.current = null;
               sessionStorage.removeItem('last_room_code');
-              setRoomState(null);
+
+              // If this was an implicit background session restore, cleanly reset without scaring user
+              if (!intent?.isExplicit) {
+                setRoomState(null);
+                return;
+              }
+
+              // Explicit join request: attempt REST and MQTT recovery before showing error
+              if (intent.code) {
+                attemptFallbackJoin(intent.code);
+              }
+              return;
             }
+            showError(data.message || 'একটি ত্রুটি ঘটেছে');
             return;
           }
         } catch (e) {
@@ -390,7 +543,7 @@ export function useRoomSocket() {
       window.clearTimeout(connectionTimeout);
       activateCloudRelay();
     }
-  }, [clientId, showError, activateCloudRelay, isVercel]);
+  }, [clientId, showError, activateCloudRelay, isVercel, applyIncomingState, attemptFallbackJoin]);
 
   useEffect(() => {
     connect();
@@ -404,10 +557,11 @@ export function useRoomSocket() {
 
   // Actions
   const createRoom = useCallback(
-    (customName?: string, customColor?: string) => {
+    async (customName?: string, customColor?: string) => {
       const activeName = customName || username || getStoredUsername() || 'শিক্ষার্থী';
       const activeColor = customColor || avatarColor || getStoredAvatarColor();
 
+      // If connected via WebSocket, send create request
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !isFallbackMode) {
         wsRef.current.send(
           JSON.stringify({
@@ -418,7 +572,36 @@ export function useRoomSocket() {
           })
         );
       } else {
-        // Cloud Relay / Vercel Room Generation
+        // First try creating via REST API on server
+        try {
+          const res = await fetch('/api/rooms/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: activeName,
+              avatarColor: activeColor,
+              clientId,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.state) {
+              setRoomState(data.state);
+              sessionStorage.setItem('last_room_code', data.code);
+              try {
+                localStorage.setItem(`esho_room_${data.code}`, JSON.stringify(data.state));
+              } catch {}
+              broadcastLocal({ type: 'SYNC_STATE', code: data.code, state: data.state });
+              setConnectionStatus('connected');
+              mqttRelayRef.current?.subscribeToRoom(data.code).then(() => {
+                mqttRelayRef.current?.publishState(data.state);
+              });
+              return;
+            }
+          }
+        } catch {}
+
+        // Cloud Relay / Static hosting room generation fallback
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         let code = '';
         for (let i = 0; i < 6; i++) {
@@ -449,6 +632,8 @@ export function useRoomSocket() {
               timestamp: Date.now(),
             },
           ],
+          version: 1,
+          lastUpdatedAt: Date.now(),
         };
 
         setRoomState(newState);
@@ -478,6 +663,10 @@ export function useRoomSocket() {
       const activeName = customName || username || getStoredUsername() || 'শিক্ষার্থী';
       const activeColor = customColor || avatarColor || getStoredAvatarColor();
 
+      // Track explicit user join intent
+      joinIntentRef.current = { code: cleanCode, isExplicit: true };
+      setConnectionStatus('connecting');
+
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !isFallbackMode) {
         wsRef.current.send(
           JSON.stringify({
@@ -489,75 +678,10 @@ export function useRoomSocket() {
           })
         );
       } else {
-        setConnectionStatus('connecting');
-
-        // First check cloud relay (works across different devices/browsers on Vercel)
-        mqttRelayRef.current?.joinRoom(
-          cleanCode,
-          (foundState: RoomState) => {
-            const alreadyIn = foundState.participants.some((p) => p.id === clientId);
-            const updatedParticipants = alreadyIn
-              ? foundState.participants
-              : [
-                  ...foundState.participants,
-                  {
-                    id: clientId,
-                    username: activeName,
-                    avatarColor: activeColor,
-                    isHost: false,
-                    joinedAt: Date.now(),
-                  },
-                ];
-
-            const updatedState: RoomState = {
-              ...foundState,
-              participants: updatedParticipants,
-              messages: alreadyIn
-                ? foundState.messages
-                : [
-                    ...foundState.messages,
-                    {
-                      id: `msg-${Date.now()}`,
-                      senderId: 'system',
-                      senderName: 'সিস্টেম',
-                      text: `${activeName} রুমে যুক্ত হয়েছেন`,
-                      type: 'system' as const,
-                      timestamp: Date.now(),
-                    },
-                  ].slice(-50),
-            };
-
-            setRoomState(updatedState);
-            sessionStorage.setItem('last_room_code', cleanCode);
-            try {
-              localStorage.setItem(`esho_room_${cleanCode}`, JSON.stringify(updatedState));
-            } catch {}
-            broadcastLocal({ type: 'SYNC_STATE', code: cleanCode, state: updatedState });
-            setIsFallbackMode(true);
-            setConnectionStatus('connected');
-
-            // Publish our joined state to other participants
-            mqttRelayRef.current?.publishState(updatedState);
-          },
-          () => {
-            // Check if available in local storage as final fallback
-            const saved = localStorage.getItem(`esho_room_${cleanCode}`);
-            if (saved) {
-              try {
-                const parsed: RoomState = JSON.parse(saved);
-                setRoomState(parsed);
-                sessionStorage.setItem('last_room_code', cleanCode);
-                setConnectionStatus('connected');
-                return;
-              } catch {}
-            }
-            setConnectionStatus('connected');
-            showError(`রুম কোড "${cleanCode}" পাওয়া যায়নি। দয়া করে কোডটি পুনরায় চেক করুন।`);
-          }
-        );
+        attemptFallbackJoin(cleanCode, activeName, activeColor);
       }
     },
-    [username, avatarColor, clientId, isFallbackMode, showError, broadcastLocal]
+    [username, avatarColor, clientId, isFallbackMode, showError, attemptFallbackJoin]
   );
 
   const putCard = useCallback(
@@ -842,6 +966,17 @@ export function useRoomSocket() {
 
   const syncRoom = useCallback(async () => {
     if (!roomState) return;
+
+    // 0. Query server REST endpoint for immediate authoritative snapshot
+    try {
+      const res = await fetch(`/api/rooms/${roomState.code}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.exists && data.state) {
+          applyIncomingState(data.state);
+        }
+      }
+    } catch {}
 
     // 1. Request latest snapshot from WebSocket server
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

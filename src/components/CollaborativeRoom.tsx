@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users,
   Plus,
@@ -65,6 +65,7 @@ export const CollaborativeRoom: React.FC = () => {
   const [cardShake, setCardShake] = useState(false);
   const [isSyncingRoom, setIsSyncingRoom] = useState(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
+  const hasAttemptedUrlJoinRef = useRef<string | null>(null);
 
   const handleSyncRoom = async () => {
     setIsSyncingRoom(true);
@@ -76,6 +77,18 @@ export const CollaborativeRoom: React.FC = () => {
     }, 2000);
   };
 
+  const handleLeaveRoom = () => {
+    hasAttemptedUrlJoinRef.current = null;
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('room')) {
+        url.searchParams.delete('room');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    }
+    leaveRoom();
+  };
+
   // Check URL query param for ?room=CODE
   useEffect(() => {
     if (typeof window !== 'undefined' && !roomState) {
@@ -84,6 +97,10 @@ export const CollaborativeRoom: React.FC = () => {
       if (roomParam) {
         const cleanParam = roomParam.trim().toUpperCase();
         setInputCode(cleanParam);
+        if (hasAttemptedUrlJoinRef.current === cleanParam) {
+          return;
+        }
+        hasAttemptedUrlJoinRef.current = cleanParam;
         if (!username) {
           setPendingAction({ type: 'join', code: cleanParam });
           setIsUsernameModalOpen(true);
@@ -93,6 +110,18 @@ export const CollaborativeRoom: React.FC = () => {
       }
     }
   }, [joinRoom, roomState, username]);
+
+  // Keep URL query in sync when roomState changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (roomState?.code) {
+      if (url.searchParams.get('room') !== roomState.code) {
+        url.searchParams.set('room', roomState.code);
+        window.history.replaceState({}, '', url.pathname + url.search);
+      }
+    }
+  }, [roomState?.code]);
 
   const handleCopyCode = () => {
     if (!roomState) return;
@@ -456,7 +485,7 @@ export const CollaborativeRoom: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={leaveRoom}
+                  onClick={handleLeaveRoom}
                   className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold font-bengali transition flex items-center gap-1 border border-rose-200 min-h-[36px]"
                   title="রুম ছেড়ে যান"
                 >
