@@ -8,8 +8,8 @@ interface BrokerConfig {
 }
 
 const BROKERS: BrokerConfig[] = [
-  { host: 'broker.emqx.io', port: 8084, path: '/mqtt' },
   { host: 'broker.hivemq.com', port: 8884, path: '/mqtt' },
+  { host: 'broker.emqx.io', port: 8084, path: '/mqtt' },
 ];
 
 export class MqttRoomRelay {
@@ -83,7 +83,7 @@ export class MqttRoomRelay {
 
         client.connect({
           useSSL: true,
-          timeout: 5,
+          timeout: 3,
           keepAliveInterval: 30,
           cleanSession: true,
           onSuccess: () => {
@@ -200,7 +200,7 @@ export class MqttRoomRelay {
 
     const topic = this.getTopic(cleanCode);
 
-    // Timeout: if no retained message arrives in 3.5 seconds, consider room not found
+    // Timeout: if no retained message arrives in 1.8 seconds, consider room not found
     if (this.joinTimeoutRef) {
       window.clearTimeout(this.joinTimeoutRef);
     }
@@ -213,7 +213,7 @@ export class MqttRoomRelay {
         this.joinTimeoutRef = null;
         onNotFound();
       }
-    }, 3500);
+    }, 1800);
 
     // Temporarily listen for the initial state
     const originalCallback = this.onStateCallback;
