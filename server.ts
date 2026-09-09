@@ -1,7 +1,6 @@
 import express from 'express';
 import http from 'http';
 import path from 'path';
-import fs from 'fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
 
@@ -37,72 +36,13 @@ interface Room {
   createdAt: number;
   lastActivity: number;
   version: number;
-  participants: Map<string, { ws: WebSocket | null; info: RoomParticipant }>;
+  participants: Map<string, { ws: WebSocket; info: RoomParticipant }>;
   activeCard: PlacedCard | null;
   historyCount: number;
   messages: RoomMessage[];
 }
 
 const rooms = new Map<string, Room>();
-const CACHE_FILE = path.join(process.cwd(), '.rooms_cache.json');
-
-function saveRoomsToDisk() {
-  try {
-    const serialized: Record<string, any> = {};
-    for (const [code, room] of rooms.entries()) {
-      serialized[code] = {
-        code: room.code,
-        createdAt: room.createdAt,
-        lastActivity: room.lastActivity,
-        version: room.version,
-        activeCard: room.activeCard,
-        historyCount: room.historyCount,
-        messages: room.messages,
-        participants: Array.from(room.participants.values()).map((p) => p.info),
-      };
-    }
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(serialized, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('[Server] Could not save rooms to disk:', err);
-  }
-}
-
-function loadRoomsFromDisk() {
-  try {
-    if (fs.existsSync(CACHE_FILE)) {
-      const data = fs.readFileSync(CACHE_FILE, 'utf-8');
-      const parsed = JSON.parse(data);
-      const now = Date.now();
-      for (const [code, item] of Object.entries<any>(parsed)) {
-        // Keep active rooms for up to 48 hours so users never lose room links
-        if (now - (item.lastActivity || item.createdAt || 0) < 48 * 60 * 60 * 1000) {
-          const room: Room = {
-            code: item.code,
-            createdAt: item.createdAt || now,
-            lastActivity: item.lastActivity || now,
-            version: item.version || 1,
-            participants: new Map(),
-            activeCard: item.activeCard || null,
-            historyCount: item.historyCount || 0,
-            messages: item.messages || [],
-          };
-          if (Array.isArray(item.participants)) {
-            for (const p of item.participants) {
-              room.participants.set(p.id, { ws: null, info: p });
-            }
-          }
-          rooms.set(code, room);
-        }
-      }
-      console.log(`[Server] Restored ${rooms.size} active rooms from persistent cache.`);
-    }
-  } catch (err) {
-    console.warn('[Server] Could not load rooms from disk:', err);
-  }
-}
-
-// Load persisted rooms on initial startup
-loadRoomsFromDisk();
 
 // Helper to generate unique room code (e.g. 6 digits)
 function generateRoomCode(): string {
@@ -117,20 +57,15 @@ function generateRoomCode(): string {
   return code;
 }
 
-// Clean up stale empty rooms periodically (keep alive for at least 6 hours)
+// Clean up stale empty rooms periodically
 setInterval(() => {
   const now = Date.now();
-  let changed = false;
   for (const [code, room] of rooms.entries()) {
-    if (room.participants.size === 0 && now - room.lastActivity > 1000 * 60 * 60 * 6) {
+    if (room.participants.size === 0 && now - room.lastActivity > 1000 * 60 * 30) {
       rooms.delete(code);
-      changed = true;
     }
   }
-  if (changed) {
-    saveRoomsToDisk();
-  }
-}, 1000 * 60 * 15);
+}, 1000 * 60 * 5);
 
 function getRoomStateDTO(room: Room) {
   const participants: RoomParticipant[] = Array.from(room.participants.values()).map(
@@ -151,7 +86,7 @@ function getRoomStateDTO(room: Room) {
 function broadcastToRoom(room: Room, messageObj: any) {
   const data = JSON.stringify(messageObj);
   for (const { ws } of room.participants.values()) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws.readyState === WebSocket.OPEN) {
       ws.send(data);
     }
   }
@@ -169,226 +104,18 @@ async function startServer() {
     res.json({ status: 'ok', roomsActive: rooms.size });
   });
 
-  // Check or fetch room by code (handles both /api/rooms/check/:code and /api/rooms/:code)
-  app.get(['/api/rooms/check/:code', '/api/rooms/:code'], (req, res) => {
+  app.get('/api/rooms/check/:code', (req, res) => {
     const code = req.params.code?.toUpperCase().trim();
     const room = rooms.get(code);
     if (!room) {
-      return res.status(404).json({ exists: false, error: `রুম "${code}" পাওয়া যায়নি` });
+      return res.status(404).json({ exists: false, error: 'রুম পাওয়া যায়নি' });
     }
     return res.json({
       exists: true,
       code: room.code,
       participantCount: room.participants.size,
       hasActiveCard: !!room.activeCard,
-      state: getRoomStateDTO(room),
     });
-  });
-
-  // REST: Create Room
-  app.post('/api/rooms/create', (req, res) => {
-    const { username, avatarColor, clientId, preferredCode } = req.body || {};
-    const code = (preferredCode || generateRoomCode()).toUpperCase().trim();
-    let room = rooms.get(code);
-    if (!room) {
-      room = {
-        code,
-        createdAt: Date.now(),
-        lastActivity: Date.now(),
-        version: 1,
-        participants: new Map(),
-        activeCard: null,
-        historyCount: 0,
-        messages: [
-          {
-            id: `msg-${Date.now()}`,
-            senderId: 'system',
-            senderName: 'সিস্টেম',
-            text: `রুম তৈরি হয়েছে (কোড: ${code})। ${username || 'ব্যবহারকারী'} যোগ দিয়েছেন।`,
-            type: 'system',
-            timestamp: Date.now(),
-          },
-        ],
-      };
-      rooms.set(code, room);
-    }
-    const participantInfo: RoomParticipant = {
-      id: clientId || `client-${Date.now()}`,
-      username: username?.trim() || 'শিক্ষার্থী',
-      avatarColor: avatarColor || '#059669',
-      isHost: true,
-      joinedAt: Date.now(),
-    };
-    room.participants.set(participantInfo.id, { ws: null, info: participantInfo });
-    room.lastActivity = Date.now();
-    saveRoomsToDisk();
-    return res.json({
-      success: true,
-      code,
-      state: getRoomStateDTO(room),
-    });
-  });
-
-  // REST: Join Room
-  app.post('/api/rooms/join', (req, res) => {
-    const { roomCode, username, avatarColor, clientId } = req.body || {};
-    const cleanCode = (roomCode || '').toUpperCase().trim();
-    const room = rooms.get(cleanCode);
-    if (!room) {
-      return res.status(404).json({ success: false, error: `রুম কোড "${cleanCode}" পাওয়া যায়নি।` });
-    }
-    const participantInfo: RoomParticipant = {
-      id: clientId || `client-${Date.now()}`,
-      username: username?.trim() || 'শিক্ষার্থী',
-      avatarColor: avatarColor || '#2563eb',
-      isHost: room.participants.size === 0,
-      joinedAt: Date.now(),
-    };
-    room.participants.set(participantInfo.id, { ws: null, info: participantInfo });
-    room.lastActivity = Date.now();
-    saveRoomsToDisk();
-    broadcastToRoom(room, {
-      type: 'ROOM_STATE',
-      state: getRoomStateDTO(room),
-    });
-    return res.json({
-      success: true,
-      code: cleanCode,
-      state: getRoomStateDTO(room),
-    });
-  });
-
-  // REST: Synchronize Room State from fallback or peer
-  app.post('/api/rooms/sync', (req, res) => {
-    const incoming = req.body?.state;
-    if (!incoming || !incoming.code) {
-      return res.status(400).json({ success: false, error: 'Invalid room state' });
-    }
-    const cleanCode = incoming.code.toUpperCase().trim();
-    let room = rooms.get(cleanCode);
-    if (!room) {
-      room = {
-        code: cleanCode,
-        createdAt: incoming.createdAt || Date.now(),
-        lastActivity: Date.now(),
-        version: incoming.version || 1,
-        participants: new Map(),
-        activeCard: incoming.activeCard || null,
-        historyCount: incoming.historyCount || 0,
-        messages: incoming.messages || [],
-      };
-      if (Array.isArray(incoming.participants)) {
-        for (const p of incoming.participants) {
-          room.participants.set(p.id, { ws: null, info: p });
-        }
-      }
-      rooms.set(cleanCode, room);
-    } else {
-      if ((incoming.version || 0) >= (room.version || 0)) {
-        room.version = incoming.version;
-        room.activeCard = incoming.activeCard;
-        room.historyCount = Math.max(room.historyCount, incoming.historyCount || 0);
-      }
-      room.lastActivity = Date.now();
-      if (Array.isArray(incoming.participants)) {
-        for (const p of incoming.participants) {
-          if (!room.participants.has(p.id)) {
-            room.participants.set(p.id, { ws: null, info: p });
-          }
-        }
-      }
-      if (Array.isArray(incoming.messages)) {
-        const msgMap = new Map<string, RoomMessage>();
-        room.messages.forEach((m) => msgMap.set(m.id, m));
-        incoming.messages.forEach((m: RoomMessage) => msgMap.set(m.id, m));
-        room.messages = Array.from(msgMap.values()).sort((a, b) => a.timestamp - b.timestamp).slice(-50);
-      }
-    }
-    saveRoomsToDisk();
-    broadcastToRoom(room, {
-      type: 'ROOM_STATE',
-      state: getRoomStateDTO(room),
-    });
-    return res.json({ success: true, state: getRoomStateDTO(room) });
-  });
-
-  // REST: Action on Room (put card, flip card, clear, chat, etc. over HTTP)
-  app.post('/api/rooms/:code/action', (req, res) => {
-    const code = req.params.code?.toUpperCase().trim();
-    const room = rooms.get(code);
-    if (!room) {
-      return res.status(404).json({ success: false, error: `রুম "${code}" পাওয়া যায়নি` });
-    }
-
-    const { action, payload, clientId, username } = req.body || {};
-    room.lastActivity = Date.now();
-
-    if (action === 'PUT_CARD' || action === 'REFRESH_CARD') {
-      const { cardId, mode } = payload || {};
-      if (action === 'PUT_CARD' && room.activeCard && !room.activeCard.isFlipped && !payload?.forceRefresh) {
-        return res.status(400).json({
-          success: false,
-          error: `বর্তমান কার্ডটি এখনো উল্টানো হয়নি! ${room.activeCard.putByUsername} এটি উল্টানোর পর পরবর্তী কার্ড রাখা যাবে।`,
-        });
-      }
-      room.version = Math.max((room.version || 0) + 1, Number(payload?.version) || 0);
-      room.activeCard = {
-        cardId,
-        putByUserId: clientId || 'anonymous',
-        putByUsername: username || 'শিক্ষার্থী',
-        putAt: Date.now(),
-        isFlipped: false,
-        mode: mode || 'photo',
-      };
-      room.messages.push({
-        id: `msg-${Date.now()}`,
-        senderId: 'system',
-        senderName: 'সিস্টেম',
-        text: `${username || 'শিক্ষার্থী'} একটি কার্ড রেখেছেন। উত্তর চিন্তা করুন!`,
-        type: 'system',
-        timestamp: Date.now(),
-      });
-    } else if (action === 'FLIP_CARD') {
-      if (room.activeCard && !room.activeCard.isFlipped) {
-        room.version = Math.max((room.version || 0) + 1, Number(payload?.version) || 0);
-        room.activeCard.isFlipped = true;
-        room.activeCard.flippedAt = Date.now();
-        room.historyCount += 1;
-        room.messages.push({
-          id: `msg-${Date.now()}`,
-          senderId: 'system',
-          senderName: 'সিস্টেম',
-          text: `${username || 'শিক্ষার্থী'} কার্ডটি উল্টে দিয়েছেন এবং উত্তর প্রকাশ করেছেন!`,
-          type: 'system',
-          timestamp: Date.now(),
-        });
-      }
-    } else if (action === 'CLEAR_CARD') {
-      if (room.activeCard) {
-        room.version = Math.max((room.version || 0) + 1, Number(payload?.version) || 0);
-        room.activeCard = null;
-      }
-    } else if (action === 'SEND_MESSAGE') {
-      const { text, messageType } = payload || {};
-      if (text && typeof text === 'string') {
-        const msg: RoomMessage = {
-          id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          senderId: clientId || 'anon',
-          senderName: username || 'শিক্ষার্থী',
-          text: text.slice(0, 200),
-          type: messageType === 'reaction' ? 'reaction' : 'chat',
-          timestamp: Date.now(),
-        };
-        room.messages.push(msg);
-      }
-    }
-
-    saveRoomsToDisk();
-    broadcastToRoom(room, {
-      type: 'ROOM_STATE',
-      state: getRoomStateDTO(room),
-    });
-    return res.json({ success: true, state: getRoomStateDTO(room) });
   });
 
   // WebSocket Server setup on /ws

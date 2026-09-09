@@ -46,8 +46,7 @@ export default function App() {
   const [onlyPhotoItems, setOnlyPhotoItems] = useState<boolean>(false);
   const [onlyBookmarked, setOnlyBookmarked] = useState<boolean>(false);
   const [onlyMastered, setOnlyMastered] = useState<boolean>(false);
-  const [isMobileChapterPickerOpen, setIsMobileChapterPickerOpen] = useState<boolean>(false);
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // Lessons available under currently selected unit
   const availableLessons = useMemo(() => {
@@ -131,6 +130,7 @@ export default function App() {
     if (direction) {
       setCardDirection(direction);
     }
+    setIsMobileMenuOpen(false);
   }, []);
 
   const activeModeObj = useMemo(() => {
@@ -306,13 +306,25 @@ export default function App() {
             </div>
           </div>
 
-          {/* Header Actions (Bookmarks, Mastered Filter Badges) */}
+          {/* Header Actions (Bookmarks, Mastered, and Mobile Menu Toggle) */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Active Mode indicator badge on mobile */}
+            <button
+              id="btn-active-mode-indicator"
+              onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+              className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-bengali font-semibold transition hover:bg-emerald-100"
+              title="মোড পরিবর্তন করতে ট্যাপ করুন"
+            >
+              {React.createElement(activeModeObj.icon, { className: 'w-3.5 h-3.5 text-emerald-700 shrink-0' })}
+              <span className="truncate max-w-[75px] sm:max-w-[100px]">{activeModeObj.shortLabel}</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-emerald-700 transition-transform ${isMobileMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
             {/* Bookmarks Filter */}
             <button
               id="btn-filter-bookmarks"
               onClick={() => setOnlyBookmarked(!onlyBookmarked)}
-              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl border transition text-xs font-bengali ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl border transition text-xs font-bengali ${
                 onlyBookmarked
                   ? 'bg-amber-100/90 text-amber-900 border-amber-300 font-semibold'
                   : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
@@ -328,7 +340,7 @@ export default function App() {
             <button
               id="btn-filter-mastered"
               onClick={() => setOnlyMastered(!onlyMastered)}
-              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl border transition text-xs font-bengali ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl border transition text-xs font-bengali ${
                 onlyMastered
                   ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-semibold'
                   : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
@@ -339,11 +351,69 @@ export default function App() {
               <span className="hidden sm:inline">মুখস্থ</span>
               <span className="text-[11px] px-1 rounded-md bg-emerald-200/60 font-bold">{masteredIds.length}</span>
             </button>
+
+            {/* Mobile Hamburger Toggle */}
+            <button
+              id="btn-mobile-nav-toggle"
+              onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+              className="md:hidden p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition border border-stone-200 flex items-center justify-center min-w-[36px] min-h-[36px]"
+              aria-label="মোবাইল নেভিগেশন মেনু"
+            >
+              {isMobileMenuOpen ? <X className="w-4 h-4 text-stone-900" /> : <Menu className="w-4 h-4 text-stone-900" />}
+            </button>
           </div>
         </div>
 
-        {/* Primary Mode Tabs (Desktop Only: clean horizontal flex) */}
-        <div className="hidden md:flex max-w-7xl mx-auto px-3 sm:px-6 items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none py-2 border-t border-stone-100 touch-pan-x">
+        {/* Mobile Dropdown Menu (Animated slide-down when open) */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-stone-200 bg-white/98 backdrop-blur-md px-3.5 py-3 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-200">
+            <div className="text-[11px] font-bold text-stone-400 font-bengali uppercase tracking-wider px-1">
+              অনুশীলন ও অধ্যায়ন মোড
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {studyModesList.map((item) => {
+                const Icon = item.icon;
+                const active = isModeActive(item.id, item.direction);
+                return (
+                  <button
+                    key={item.key}
+                    id={`mobile-tab-mode-${item.key}`}
+                    onClick={() => handleSelectMode(item.id, item.direction)}
+                    className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-bengali font-semibold transition border min-h-[44px] ${
+                      active
+                        ? item.isLive
+                          ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                          : 'bg-emerald-800 text-white border-emerald-900 shadow-xs'
+                        : item.isLive
+                        ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'
+                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg ${active ? 'bg-white/20 text-white' : 'bg-white border border-stone-200 text-stone-700'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span>{item.label}</span>
+                    </div>
+                    {item.isLive ? (
+                      <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        LIVE
+                      </span>
+                    ) : item.badge ? (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${active ? 'bg-white/25 text-white' : 'bg-stone-200 text-stone-700'}`}>
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Primary Mode Tabs (Visible on all screens: horizontal swipe on mobile, clean flex on desktop) */}
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none py-2 border-t border-stone-100 touch-pan-x">
           {studyModesList.map((item) => {
             const Icon = item.icon;
             const active = isModeActive(item.id, item.direction);
@@ -380,70 +450,73 @@ export default function App() {
       {/* Book Chapter & Lesson Selection Hierarchy (Shown in study modes) */}
       {studyMode !== 'room' && (
         <>
-          <nav aria-label="অধ্যায় ও পাঠ ফিল্টার" className="bg-stone-100/90 border-b border-stone-200/90 px-3 sm:px-6 py-2 sm:py-2.5">
+          <nav className="bg-stone-100/90 border-b border-stone-200/90 px-3 sm:px-6 py-2.5">
             <div className="max-w-7xl mx-auto space-y-2">
-              {/* Mobile Compact Single-Line Chapter Selector & Search (< md) */}
-              <div className="md:hidden space-y-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    id="btn-open-chapter-picker"
-                    onClick={() => setIsMobileChapterPickerOpen(true)}
-                    className="flex-1 flex items-center justify-between px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bengali text-stone-800 shadow-2xs min-h-[40px] active:bg-stone-50"
+              {/* Mobile Chapter Selector (Compact native selector for mobile screens < md) */}
+              <div className="md:hidden flex flex-col sm:flex-row gap-2">
+                <div className="flex-1">
+                  <label className="text-[11px] font-semibold text-stone-600 font-bengali mb-1 flex items-center gap-1">
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-700" />
+                    মূল অধ্যায়:
+                  </label>
+                  <select
+                    id="select-unit-mobile"
+                    value={selectedUnitNumber}
+                    onChange={(e) => {
+                      const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
+                      setSelectedUnitNumber(val);
+                      setSelectedChapterId('all');
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 bg-white font-bengali text-stone-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   >
-                    <div className="flex items-center gap-1.5 truncate">
-                      <BookOpen className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                      <span className="font-semibold text-emerald-950 truncate">
-                        {selectedUnitNumber === 'all'
-                          ? 'বই সমগ্র'
-                          : bookUnits.find((u) => u.number === selectedUnitNumber)?.titleBn}
-                      </span>
-                      <span className="text-stone-400">•</span>
-                      <span className="text-stone-600 truncate">
-                        {selectedChapterId === 'all'
-                          ? 'সকল পাঠ'
-                          : chapters.find((c) => c.id === selectedChapterId)?.titleBn}
-                      </span>
-                    </div>
-                    <ChevronDown className="w-3.5 h-3.5 text-stone-500 shrink-0 ml-1" />
-                  </button>
-
-                  <button
-                    id="btn-mobile-toggle-search"
-                    onClick={() => setIsMobileSearchOpen((prev) => !prev)}
-                    className={`p-2 rounded-xl border text-stone-600 transition min-w-[40px] min-h-[40px] flex items-center justify-center ${
-                      isMobileSearchOpen || searchQuery
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                        : 'bg-white border-stone-300'
-                    }`}
-                    aria-label="শব্দ অনুসন্ধান"
-                    title="শব্দ অনুসন্ধান করুন"
-                  >
-                    <Search className="w-4 h-4" />
-                  </button>
+                    <option value="all">বই সমগ্র ({vocabularyItems.length} শব্দ)</option>
+                    {bookUnits.map((u) => {
+                      const unitCount = vocabularyItems.filter((i) => {
+                        const ch = chapters.find((c) => c.id === i.chapterId);
+                        return ch?.unitNumber === u.number;
+                      }).length;
+                      return (
+                        <option key={u.id} value={u.number}>
+                          {u.titleBn} ({u.titleAr}) - [{unitCount} শব্দ]
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
 
-                {/* Collapsible Mobile Search Input */}
-                {(isMobileSearchOpen || searchQuery) && (
-                  <div className="relative animate-in slide-in-from-top-1 duration-150">
-                    <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      id="input-vocab-search-mobile"
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="শব্দ খুঁজুন (বাংলা / আরবী / ইংরেজি)..."
-                      className="w-full pl-9 pr-8 py-2 bg-white border border-emerald-400 rounded-xl text-xs font-bengali focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-stone-600"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div className="flex-1">
+                  <label className="text-[11px] font-semibold text-stone-600 font-bengali mb-1 flex items-center gap-1">
+                    <Layers className="w-3.5 h-3.5 text-emerald-700" />
+                    নির্দিষ্ট পাঠ:
+                  </label>
+                  <select
+                    id="select-lesson-mobile"
+                    value={selectedChapterId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedChapterId(val);
+                      if (val !== 'all') {
+                        const ch = chapters.find((c) => c.id === val);
+                        if (ch && selectedUnitNumber !== ch.unitNumber) {
+                          setSelectedUnitNumber(ch.unitNumber);
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 bg-white font-bengali text-stone-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  >
+                    <option value="all">
+                      {selectedUnitNumber === 'all' ? 'সকল পাঠ' : 'এই অধ্যায়ের সকল পাঠ'}
+                    </option>
+                    {availableLessons.map((ch) => {
+                      const count = vocabularyItems.filter((i) => i.chapterId === ch.id).length;
+                      return (
+                        <option key={ch.id} value={ch.id}>
+                          {ch.titleBn} ({count}টি শব্দ)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
 
               {/* Desktop Tier 1: 3 Book Units (আল-ওয়াহদাতু ১, ২, ৩) (Visible >= md) */}
@@ -538,10 +611,10 @@ export default function App() {
             </div>
           </nav>
 
-          {/* Desktop Search & Filter Bar (Visible >= md) */}
-          <div className="hidden md:flex max-w-7xl mx-auto w-full px-4 sm:px-6 py-3 items-center justify-between gap-3">
+          {/* Controls & Search Bar */}
+          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* Search */}
-            <div className="relative w-80">
+            <div className="relative w-full sm:w-80">
               <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 id="input-vocab-search"
@@ -562,7 +635,7 @@ export default function App() {
             </div>
 
             {/* Filters */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
               <label className="flex items-center gap-1.5 text-xs text-stone-600 font-bengali cursor-pointer select-none bg-white px-3 py-2 rounded-xl border border-stone-200 shadow-2xs">
                 <input
                   type="checkbox"
@@ -582,7 +655,7 @@ export default function App() {
       )}
 
       {/* MAIN CONTENT AREA */}
-      <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 flex-1 pb-24 md:pb-16">
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 flex-1 pb-16">
         {/* 1. FLASHCARD MODE */}
         {studyMode === 'flashcards' && (
           <div className="flex flex-col items-center">
@@ -598,58 +671,16 @@ export default function App() {
               </div>
             ) : currentItem ? (
               <div className="w-full max-w-xl sm:max-w-2xl flex flex-col items-center gap-3 sm:gap-4">
-                {/* Direction Switcher & Card Count */}
-                <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-stone-500 font-bengali px-1">
-                  <div className="flex items-center gap-1 bg-stone-200/80 p-1 rounded-xl w-full sm:w-auto">
-                    <button
-                      id="btn-dir-photo"
-                      onClick={() => setCardDirection('photo')}
-                      className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bengali font-semibold transition ${
-                        cardDirection === 'photo'
-                          ? 'bg-white text-emerald-950 shadow-2xs'
-                          : 'text-stone-600 hover:text-stone-900'
-                      }`}
-                    >
-                      ছবি কার্ড
-                    </button>
-                    <button
-                      id="btn-dir-bn-to-ar"
-                      onClick={() => setCardDirection('bn_to_ar')}
-                      className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bengali font-semibold transition ${
-                        cardDirection === 'bn_to_ar'
-                          ? 'bg-white text-emerald-950 shadow-2xs'
-                          : 'text-stone-600 hover:text-stone-900'
-                      }`}
-                    >
-                      বাংলা ➔ আরবী
-                    </button>
-                    <button
-                      id="btn-dir-ar-to-bn"
-                      onClick={() => setCardDirection('ar_to_bn')}
-                      className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bengali font-semibold transition ${
-                        cardDirection === 'ar_to_bn'
-                          ? 'bg-white text-emerald-950 shadow-2xs'
-                          : 'text-stone-600 hover:text-stone-900'
-                      }`}
-                    >
-                      আরবী ➔ বাংলা
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto px-1">
-                    <label className="md:hidden flex items-center gap-1 text-[11px] cursor-pointer text-stone-600 select-none">
-                      <input
-                        type="checkbox"
-                        checked={onlyPhotoItems}
-                        onChange={(e) => setOnlyPhotoItems(e.target.checked)}
-                        className="rounded text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span>কেবল ছবিযুক্ত</span>
-                    </label>
-                    <span className="font-semibold text-emerald-800 shrink-0">
-                      কার্ড {currentIndex + 1} / {filteredItems.length}
-                    </span>
-                  </div>
+                {/* Mode Indicator & Shortcuts Info */}
+                <div className="w-full flex items-center justify-between text-xs text-stone-500 font-bengali px-2">
+                  <span className="font-semibold text-emerald-800">
+                    {cardDirection === 'photo' && 'চিত্রযুক্ত মোড'}
+                    {cardDirection === 'bn_to_ar' && 'বাংলা ➔ আরবী মোড'}
+                    {cardDirection === 'ar_to_bn' && 'আরবী ➔ বাংলা মোড'}
+                  </span>
+                  <span>
+                    কার্ড {currentIndex + 1} / {filteredItems.length}
+                  </span>
                 </div>
 
                 {/* The Flashcard */}
@@ -971,184 +1002,11 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="mt-auto bg-white border-t border-stone-200 py-4 text-center text-xs text-stone-500 font-bengali mb-16 md:mb-0">
+      <footer className="mt-auto bg-white border-t border-stone-200 py-4 text-center text-xs text-stone-500 font-bengali">
         <p>
           "এসো আরবী শিখি" (الطريق إلى العربية) — হযরত মাওলানা আবু তাহের মেসবাহ দামাত বারাকাতুহুম
         </p>
       </footer>
-
-      {/* Single Mobile Bottom Navigation Bar (Fixed bottom for mobile screens < md) */}
-      <nav
-        aria-label="মোবাইল প্রধান নেভিগেশন"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/98 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-1 py-1 flex items-center justify-around"
-      >
-        {[
-          { id: 'flashcards' as StudyMode, label: 'ফ্ল্যাশ কার্ড', icon: BookOpen },
-          { id: 'photo_gallery' as StudyMode, label: 'গ্যালারি', icon: Sparkles },
-          { id: 'quiz' as StudyMode, label: 'কুইজ', icon: HelpCircle },
-          { id: 'glossary' as StudyMode, label: 'শব্দকোষ', icon: List },
-          { id: 'room' as StudyMode, label: 'লাইভ রুম', icon: Users, isLive: true },
-        ].map((item) => {
-          const Icon = item.icon;
-          const active = studyMode === item.id;
-          return (
-            <button
-              key={item.id}
-              id={`mobile-nav-${item.id}`}
-              onClick={() => {
-                setStudyMode(item.id);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] min-h-[44px] transition relative ${
-                active
-                  ? 'text-emerald-800 font-bold'
-                  : 'text-stone-500 hover:text-stone-800 font-medium'
-              }`}
-            >
-              <div className={`p-1 rounded-lg relative ${active ? 'bg-emerald-100 text-emerald-800' : ''}`}>
-                <Icon className="w-5 h-5" />
-                {item.isLive && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-pulse ring-2 ring-white" />
-                )}
-              </div>
-              <span className="text-[10px] font-bengali mt-0.5 leading-none">
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Mobile Chapter & Lesson Picker Bottom-Sheet Modal */}
-      {isMobileChapterPickerOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-stone-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-          onClick={() => setIsMobileChapterPickerOpen(false)}
-        >
-          <div
-            className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl border border-stone-200 animate-in slide-in-from-bottom-4 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200 shrink-0">
-              <h3 className="text-base font-bold font-bengali text-stone-900 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-emerald-700" />
-                অধ্যায় ও পাঠ নির্বাচন
-              </h3>
-              <button
-                onClick={() => setIsMobileChapterPickerOpen(false)}
-                className="p-1.5 text-stone-400 hover:text-stone-700 rounded-full transition"
-                aria-label="বন্ধ করুন"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Scrollable Content */}
-            <div className="p-5 overflow-y-auto space-y-4 font-bengali flex-1">
-              {/* Unit Selection */}
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1.5">
-                  মূল অধ্যায় (আল-ওয়াহদাতু):
-                </label>
-                <div className="grid grid-cols-1 gap-1.5">
-                  <button
-                    onClick={() => {
-                      setSelectedUnitNumber('all');
-                      setSelectedChapterId('all');
-                    }}
-                    className={`p-2.5 rounded-xl text-left text-xs font-semibold border transition flex items-center justify-between ${
-                      selectedUnitNumber === 'all'
-                        ? 'bg-emerald-800 text-white border-emerald-900 shadow-xs'
-                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                    }`}
-                  >
-                    <span>বই সমগ্র (সকল অধ্যায়)</span>
-                    <span className="text-[11px] opacity-80">{vocabularyItems.length}টি শব্দ</span>
-                  </button>
-                  {bookUnits.map((u) => {
-                    const count = vocabularyItems.filter((i) => {
-                      const ch = chapters.find((c) => c.id === i.chapterId);
-                      return ch?.unitNumber === u.number;
-                    }).length;
-                    return (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          setSelectedUnitNumber(u.number);
-                          setSelectedChapterId('all');
-                        }}
-                        className={`p-2.5 rounded-xl text-left text-xs font-semibold border transition flex items-center justify-between ${
-                          selectedUnitNumber === u.number
-                            ? 'bg-emerald-800 text-white border-emerald-900 shadow-xs'
-                            : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                        }`}
-                      >
-                        <div>
-                          <span>{u.titleBn}</span>
-                          <span className="font-arabic ml-1.5 opacity-80 dir-rtl">({u.titleAr})</span>
-                        </div>
-                        <span className="text-[11px] opacity-80">{count}টি শব্দ</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Lesson Selection */}
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1.5">
-                  নির্দিষ্ট পাঠ (আদ-দারসু):
-                </label>
-                <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
-                  <button
-                    onClick={() => setSelectedChapterId('all')}
-                    className={`p-2 rounded-xl text-left text-xs font-semibold border transition col-span-2 ${
-                      selectedChapterId === 'all'
-                        ? 'bg-emerald-700 text-white border-emerald-800'
-                        : 'bg-stone-50 text-stone-700 border-stone-200'
-                    }`}
-                  >
-                    {selectedUnitNumber === 'all' ? 'সকল পাঠ' : 'এই অধ্যায়ের সকল পাঠ'}
-                  </button>
-                  {availableLessons.map((ch) => {
-                    const count = vocabularyItems.filter((i) => i.chapterId === ch.id).length;
-                    return (
-                      <button
-                        key={ch.id}
-                        onClick={() => {
-                          setSelectedChapterId(ch.id);
-                          if (selectedUnitNumber !== ch.unitNumber) {
-                            setSelectedUnitNumber(ch.unitNumber);
-                          }
-                        }}
-                        className={`p-2 rounded-xl text-left text-xs font-medium border transition ${
-                          selectedChapterId === ch.id
-                            ? 'bg-emerald-700 text-white border-emerald-800 font-bold'
-                            : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                        }`}
-                      >
-                        <div className="truncate">{ch.titleBn}</div>
-                        <div className="text-[10px] opacity-75">{count}টি শব্দ</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-stone-200 bg-stone-50 shrink-0">
-              <button
-                onClick={() => setIsMobileChapterPickerOpen(false)}
-                className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold font-bengali shadow-sm transition"
-              >
-                ঠিক আছে
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
