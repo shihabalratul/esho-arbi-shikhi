@@ -70,7 +70,7 @@
 - **Echo Suppression**: Self-published MQTT messages are identified via `_senderId` and ignored to prevent overwriting optimistic local state.
 - **Message Union Merging**: Chat and reaction messages are merged by unique IDs across both clients so no messages are lost.
 - **Single Retained MQTT Publish**: Eliminates duplicate packets and broker congestion by sending a single retained message (`qos: 0, retained: true`) on topic `esho_arabi_v3/room_{CODE}`.
-- **2-Second Keepalive Ping**: A high-frequency background heartbeat ping runs every 2 seconds across WebSockets and MQTT to keep real-time sockets warm and responsive against mobile cellular idle timeouts.
+- **15-Second Recommended Keepalive Ping**: A balanced background heartbeat ping runs every 15 seconds across WebSockets and MQTT to keep real-time sockets warm against mobile cellular idle timeouts without battery drain or public broker throttling.
 
 ### 3. Textbook Vocabulary Data Integrity
 - All vocabulary items, transliterations, Bangla translations, example phrases, and categories are strictly derived from the authentic "এসো আরবী শিখি" textbook curriculum.

@@ -84,54 +84,67 @@ export function useRoomSocket() {
         .slice(-50);
 
       // Determine activeCard:
-      // If there is conflict between two users' actions, the earlier action (earliest putAt timestamp) wins and syncs to everyone.
       let resolvedCard = prev.activeCard;
       let shouldRebroadcastWinner = false;
 
-      if (!prev.activeCard && incoming.activeCard) {
-        resolvedCard = incoming.activeCard;
-      } else if (prev.activeCard && !incoming.activeCard) {
-        resolvedCard = isIncomingNewerOrEqual ? null : prev.activeCard;
-        if (!isIncomingNewerOrEqual) {
-          shouldRebroadcastWinner = true;
-        }
-      } else if (prev.activeCard && incoming.activeCard) {
-        if (
-          prev.activeCard.cardId === incoming.activeCard.cardId &&
-          prev.activeCard.putAt === incoming.activeCard.putAt
-        ) {
-          // Same card instance: once flipped by anyone, it must stay flipped
-          const isFlipped = prev.activeCard.isFlipped || incoming.activeCard.isFlipped;
-          resolvedCard = {
-            ...(isIncomingNewerOrEqual ? incoming.activeCard : prev.activeCard),
-            isFlipped,
-            flippedAt: prev.activeCard.flippedAt || incoming.activeCard.flippedAt,
-          };
-        } else {
-          // Different cards placed concurrently by different users!
-          // CONFLICT RESOLUTION: The earlier action (smaller putAt timestamp) wins.
-          const prevPutAt = prev.activeCard.putAt || 0;
-          const incomingPutAt = incoming.activeCard.putAt || 0;
+      // Check if both refer to the exact same card instance
+      const isSameCardInstance =
+        Boolean(prev.activeCard &&
+        incoming.activeCard &&
+        prev.activeCard.cardId === incoming.activeCard.cardId &&
+        prev.activeCard.putAt === incoming.activeCard.putAt);
 
-          if (incomingPutAt < prevPutAt) {
-            // Incoming action happened earlier! Incoming wins.
+      if (isSameCardInstance && prev.activeCard && incoming.activeCard) {
+        // Same card instance: once flipped by anyone, it stays flipped!
+        const isFlipped = prev.activeCard.isFlipped || incoming.activeCard.isFlipped;
+        resolvedCard = {
+          ...(isIncomingNewerOrEqual ? incoming.activeCard : prev.activeCard),
+          isFlipped,
+          flippedAt: prev.activeCard.flippedAt || incoming.activeCard.flippedAt,
+        };
+      } else if (incomingVersion > prevVersion) {
+        // Incoming is strictly NEWER sequential action (new card placed, card cleared, or flipped)
+        resolvedCard = incoming.activeCard;
+      } else if (prevVersion > incomingVersion) {
+        // Local state is strictly newer
+        resolvedCard = prev.activeCard;
+        shouldRebroadcastWinner = true;
+      } else {
+        // Exact same version! (True concurrent action race)
+        if (!prev.activeCard && incoming.activeCard) {
+          resolvedCard = incoming.activeCard;
+        } else if (prev.activeCard && !incoming.activeCard) {
+          resolvedCard = null;
+        } else if (prev.activeCard && incoming.activeCard) {
+          // If the previous card was already flipped (round finished) and incoming is an un-flipped new card:
+          if (prev.activeCard.isFlipped && !incoming.activeCard.isFlipped) {
             resolvedCard = incoming.activeCard;
-          } else if (prevPutAt < incomingPutAt) {
-            // Local action happened earlier! Local earlier action wins and must be synced to others.
-            resolvedCard = prev.activeCard;
-            shouldRebroadcastWinner = true;
+          } else if (!prev.activeCard.isFlipped && incoming.activeCard.isFlipped) {
+            resolvedCard = incoming.activeCard;
           } else {
-            // Exactly equal timestamp tie-break: compare user IDs deterministically
-            if (prev.activeCard.putByUserId <= incoming.activeCard.putByUserId) {
+            // Both un-flipped different cards placed concurrently:
+            // The earlier action (earliest putAt timestamp) strictly wins!
+            const prevPutAt = prev.activeCard.putAt || 0;
+            const incomingPutAt = incoming.activeCard.putAt || 0;
+
+            if (incomingPutAt < prevPutAt) {
+              resolvedCard = incoming.activeCard;
+            } else if (prevPutAt < incomingPutAt) {
               resolvedCard = prev.activeCard;
               shouldRebroadcastWinner = true;
             } else {
-              resolvedCard = incoming.activeCard;
+              // Tie-break deterministically
+              if (prev.activeCard.putByUserId <= incoming.activeCard.putByUserId) {
+                resolvedCard = prev.activeCard;
+                shouldRebroadcastWinner = true;
+              } else {
+                resolvedCard = incoming.activeCard;
+              }
             }
           }
+        } else {
+          resolvedCard = null;
         }
-      } else {
-        resolvedCard = null;
       }
 
       // Guard: If card is the same instance and was already flipped locally, don't let un-flipped state revert it
@@ -168,7 +181,7 @@ export function useRoomSocket() {
           if (mqttRelayRef.current) {
             mqttRelayRef.current.publishState(mergedState);
           }
-        }, 60);
+        }, 50);
       }
 
       sessionStorage.setItem('last_room_code', mergedState.code);
@@ -285,13 +298,13 @@ export function useRoomSocket() {
         setConnectionStatus('connected');
         setIsFallbackMode(false);
 
-        // Start ping heartbeat every 2 seconds
+        // Start ping heartbeat every 15 seconds (recommended balance)
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = window.setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'PING' }));
           }
-        }, 2000);
+        }, 15000);
 
         // If we were previously in a room, re-join seamlessly
         const lastRoom = sessionStorage.getItem('last_room_code');
@@ -319,7 +332,7 @@ export function useRoomSocket() {
             setRoomState(data.state);
             sessionStorage.setItem('last_room_code', data.code);
             setErrorMessage(null);
-            mqttRelayRef.current?.connect().then(() => {
+            mqttRelayRef.current?.subscribeToRoom(data.code).then(() => {
               mqttRelayRef.current?.publishState(data.state);
             });
             return;
