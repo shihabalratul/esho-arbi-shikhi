@@ -359,17 +359,17 @@ export const CollaborativeRoom: React.FC = () => {
               <span
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bengali font-medium border"
                 style={{
-                  backgroundColor: isFallbackMode ? '#fef3c7' : '#ecfdf5',
-                  color: isFallbackMode ? '#92400e' : '#047857',
-                  borderColor: isFallbackMode ? '#fde68a' : '#a7f3d0',
+                  backgroundColor: isFallbackMode ? '#ecfdf5' : '#ecfdf5',
+                  color: isFallbackMode ? '#047857' : '#047857',
+                  borderColor: isFallbackMode ? '#a7f3d0' : '#a7f3d0',
                 }}
-                title={isFallbackMode ? 'Vercel / ব্রাউজার মাল্টি-ট্যাব সিঙ্ক মোড' : 'লাইভ ক্লাউড সার্ভার সংযুক্ত'}
+                title={isFallbackMode ? 'ক্লাউড রিয়েল-টাইম রিলে সক্রিয় (Vercel / ক্রস-ডিভাইস)' : 'লাইভ ক্লাউড সার্ভার সংযুক্ত'}
               >
                 <span
                   className="w-2 h-2 rounded-full animate-pulse"
-                  style={{ backgroundColor: isFallbackMode ? '#d97706' : '#10b981' }}
+                  style={{ backgroundColor: '#10b981' }}
                 />
-                <span>{isFallbackMode ? 'ট্যাব সিঙ্ক (Vercel)' : 'লাইভ সার্ভার'}</span>
+                <span>{isFallbackMode ? 'ক্লাউড লাইভ সিঙ্ক (Vercel)' : 'লাইভ সার্ভার'}</span>
               </span>
 
               <div className="text-xs text-stone-400 font-bengali hidden sm:block">
