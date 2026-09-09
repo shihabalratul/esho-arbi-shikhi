@@ -174,6 +174,11 @@ export class MqttRoomRelay {
       const data = JSON.parse(payloadStr);
       if (!data || !data.code) return;
 
+      // Ignore echoes from self to prevent overwriting newer optimistic states
+      if (data._senderId === this.clientId) {
+        return;
+      }
+
       const cleanCode = String(data.code).toUpperCase().trim();
 
       // Check if room was closed
@@ -188,6 +193,9 @@ export class MqttRoomRelay {
         activeCard: data.activeCard || null,
         historyCount: typeof data.historyCount === 'number' ? data.historyCount : 0,
         messages: Array.isArray(data.messages) ? data.messages : [],
+        version: typeof data.version === 'number' ? data.version : 0,
+        lastUpdatedAt: typeof data.lastUpdatedAt === 'number' ? data.lastUpdatedAt : Date.now(),
+        lastSenderId: data.lastSenderId || data._senderId,
       };
 
       // 1. Resolve any pending joinRoom caller waiting for this code
@@ -279,24 +287,35 @@ export class MqttRoomRelay {
 
     try {
       const topic = this.getTopic(state.code);
-      const payload = JSON.stringify(state);
+      const payload = JSON.stringify({
+        ...state,
+        _senderId: this.clientId,
+      });
 
-      // 1. Lightning-fast in-memory dispatch to currently active players (<150ms roundtrip)
-      const instantMsg = new Paho.Message(payload);
-      instantMsg.destinationName = topic;
-      instantMsg.retained = false;
-      instantMsg.qos = 0;
-      this.client.send(instantMsg);
-
-      // 2. Retained snapshot for new players who join the room later
-      const retainedMsg = new Paho.Message(payload);
-      retainedMsg.destinationName = topic;
-      retainedMsg.retained = true;
-      retainedMsg.qos = 1;
-      this.client.send(retainedMsg);
+      // Single retained message delivery with QoS 0:
+      // Delivered immediately to all active subscribers AND retained for new joiners
+      const msg = new Paho.Message(payload);
+      msg.destinationName = topic;
+      msg.retained = true;
+      msg.qos = 0;
+      this.client.send(msg);
     } catch (e) {
       console.error('[MQTT Relay] Failed to publish state:', e);
     }
+  }
+
+  public requestSync(roomCode: string) {
+    if (!this.client || !this.isConnected || !this.client.isConnected()) {
+      return;
+    }
+    const topic = this.getTopic(roomCode);
+    try {
+      this.client.unsubscribe(topic, {
+        onSuccess: () => {
+          this.client?.subscribe(topic, { qos: 0 });
+        },
+      });
+    } catch {}
   }
 
   public leaveRoom(roomCode: string, isLastUser = false) {

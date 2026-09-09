@@ -35,6 +35,7 @@ interface Room {
   code: string;
   createdAt: number;
   lastActivity: number;
+  version: number;
   participants: Map<string, { ws: WebSocket; info: RoomParticipant }>;
   activeCard: PlacedCard | null;
   historyCount: number;
@@ -77,6 +78,8 @@ function getRoomStateDTO(room: Room) {
     activeCard: room.activeCard,
     historyCount: room.historyCount,
     messages: room.messages.slice(-50), // keep latest 50 messages
+    version: room.version || 1,
+    lastUpdatedAt: room.lastActivity || Date.now(),
   };
 }
 
@@ -181,6 +184,7 @@ async function startServer() {
             code,
             createdAt: Date.now(),
             lastActivity: Date.now(),
+            version: 1,
             participants: new Map(),
             activeCard: null,
             historyCount: 0,
@@ -301,11 +305,23 @@ async function startServer() {
 
         room.lastActivity = Date.now();
 
+        // 0. SYNC ROOM
+        if (type === 'SYNC_ROOM' || type === 'GET_ROOM_STATE') {
+          ws.send(
+            JSON.stringify({
+              type: 'ROOM_STATE',
+              state: getRoomStateDTO(room),
+            })
+          );
+          return;
+        }
+
         // 1. PUT CARD
         // RULE: Any person can put a card. BUT when one flip card is put,
-        // until it is flipped by the user who put it, NO ONE can put any other card at the same time.
+        // until it is flipped by the user who put it, NO ONE can put any other card at the same time,
+        // unless forceRefresh is explicitly requested.
         if (type === 'PUT_CARD') {
-          if (room.activeCard && !room.activeCard.isFlipped) {
+          if (room.activeCard && !room.activeCard.isFlipped && !msg.forceRefresh) {
             ws.send(
               JSON.stringify({
                 type: 'ERROR',
@@ -319,6 +335,7 @@ async function startServer() {
           const { cardId, mode } = msg;
           if (!cardId) return;
 
+          room.version = Math.max((room.version || 0) + 1, Number(msg.version) || 0);
           room.activeCard = {
             cardId,
             putByUserId: participant.info.id,
@@ -345,7 +362,39 @@ async function startServer() {
           return;
         }
 
-        // 2. FLIP CARD
+        // 2. REFRESH CARD (Explicitly replace card on the table with a new one)
+        if (type === 'REFRESH_CARD') {
+          const { cardId, mode } = msg;
+          if (!cardId) return;
+
+          room.version = Math.max((room.version || 0) + 1, Number(msg.version) || 0);
+          room.activeCard = {
+            cardId,
+            putByUserId: participant.info.id,
+            putByUsername: participant.info.username,
+            putAt: Date.now(),
+            isFlipped: false,
+            mode: mode || 'photo',
+          };
+
+          const sysMsg: RoomMessage = {
+            id: `msg-${Date.now()}`,
+            senderId: 'system',
+            senderName: 'সিস্টেম',
+            text: `${participant.info.username} টেবিলের কার্ডটি রিফ্রেশ করে নতুন কার্ড এনেছেন!`,
+            type: 'system',
+            timestamp: Date.now(),
+          };
+          room.messages.push(sysMsg);
+
+          broadcastToRoom(room, {
+            type: 'ROOM_STATE',
+            state: getRoomStateDTO(room),
+          });
+          return;
+        }
+
+        // 3. FLIP CARD
         // RULE: Others CANNOT flip it except the user who put it!
         if (type === 'FLIP_CARD') {
           if (!room.activeCard) {
@@ -364,6 +413,7 @@ async function startServer() {
           }
 
           if (!room.activeCard.isFlipped) {
+            room.version = Math.max((room.version || 0) + 1, Number(msg.version) || 0);
             room.activeCard.isFlipped = true;
             room.activeCard.flippedAt = Date.now();
             room.historyCount += 1;
@@ -386,11 +436,11 @@ async function startServer() {
           return;
         }
 
-        // 3. CLEAR CARD
+        // 4. CLEAR CARD
         // If flipped, any participant or the host can clear it to prepare table
         if (type === 'CLEAR_CARD') {
           if (room.activeCard) {
-            if (!room.activeCard.isFlipped && room.activeCard.putByUserId !== participant.info.id && !participant.info.isHost) {
+            if (!room.activeCard.isFlipped && room.activeCard.putByUserId !== participant.info.id && !participant.info.isHost && !msg.forceRefresh) {
               ws.send(
                 JSON.stringify({
                   type: 'ERROR',
@@ -400,6 +450,7 @@ async function startServer() {
               return;
             }
 
+            room.version = Math.max((room.version || 0) + 1, Number(msg.version) || 0);
             room.activeCard = null;
             broadcastToRoom(room, {
               type: 'ROOM_STATE',
@@ -409,7 +460,7 @@ async function startServer() {
           return;
         }
 
-        // 4. SEND MESSAGE / REACTION
+        // 5. SEND MESSAGE / REACTION
         if (type === 'SEND_MESSAGE') {
           const { text, messageType } = msg;
           if (!text || typeof text !== 'string') return;

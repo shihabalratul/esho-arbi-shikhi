@@ -56,14 +56,23 @@
 
 ## Key Feature Logic & Rules
 
-### 1. Collaborative Practice Room Rules
-1. **Anyone can put a card on the table** if the table is empty or the previous card has been flipped.
-2. **Only the participant who put the card can flip it**. Others see it locked with the owner's name.
-3. Once flipped, **anyone in the room** can place the next card or clear the table.
-4. Rooms are identified by a 6-character code (e.g. `AR8K29`) and shareable link (`?room=AR8K29`).
-5. When a user opens a link without having a username configured, the username modal opens and automatically connects them to the room once saved.
+### 1. Collaborative Practice Room Rules & Workflow
+1. **Putting Cards**: Anyone can put a card on the table if the table is empty or the previous card has been flipped.
+2. **Card Ownership & Flip Locking**: Only the participant who put the card can flip it (`putByUserId === clientId`). Other participants see the card locked with the owner's name to foster active turn-taking and verbal quizzing.
+3. **Open Round Completion**: Once flipped, the correct answer and example sentences are revealed to everyone. Anyone in the room can then place the next card, pick a random card, refresh, or clear the table.
+4. **Instant Card Refresh (নতুন কার্ড রিফ্রেশ)**:
+   - A dedicated **"রিফ্রেশ (নতুন কার্ড)"** button is accessible at all times in the room header and stage controls.
+   - If a round gets stalled or participants wish to change the card without waiting, clicking the refresh button immediately deals a new card to everyone in the room and updates the sequence version.
+5. **Room Codes & Direct Links**: Rooms are identified by a 6-character code (e.g. `AR8K29`) and shareable link (`?room=AR8K29`). Opening a share link automatically opens the username prompt if not set and joins the session.
 
-### 2. Multi-Device Synchronization (Vercel Friendly)
-- `MqttRoomRelay` publishes retained state messages to MQTT topics `esho_arabi_v3/room_{CODE}` on HiveMQ Public WSS broker.
-- Both mobile and desktop devices subscribe to the topic to sync room state, active cards, flips, and chat.
-- Mobile heartbeat keepalive ensures mobile cellular carriers do not terminate idle connections.
+### 2. Multi-Device Synchronization & Zero-Latency State Engine
+- **Sequence Versioning (`version`)**: Every room state mutation (card placement, flip, refresh, message, clear) increments a monotonic `version` number. Incoming packets with older versions are automatically rejected to prevent out-of-order rollbacks and race conditions.
+- **Flip Protection Guard**: An already flipped card on a client will never be flipped back to un-flipped by a delayed packet.
+- **Echo Suppression**: Self-published MQTT messages are identified via `_senderId` and ignored to prevent overwriting optimistic local state.
+- **Message Union Merging**: Chat and reaction messages are merged by unique IDs across both clients so no messages are lost.
+- **Single Retained MQTT Publish**: Eliminates duplicate packets and broker congestion by sending a single retained message (`qos: 0, retained: true`) on topic `esho_arabi_v3/room_{CODE}`.
+- **Manual State Sync (`syncRoom`)**: Clicking the **"সিঙ্ক"** button in the room header forces an immediate re-subscription to the broker's retained snapshot and requests an updated state from the server.
+
+### 3. Textbook Vocabulary Data Integrity
+- All vocabulary items, transliterations, Bangla translations, example phrases, and categories are strictly derived from the authentic "এসো আরবী শিখি" textbook curriculum.
+- No dummy or mock placeholder datasets exist; all items are fully searchable, audibly playable via Web Speech API, and usable in solo and multiplayer study modes.

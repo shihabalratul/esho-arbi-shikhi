@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { RoomState, CardDirection, VocabularyItem } from '../types';
+import { RoomState, RoomParticipant, RoomMessage, CardDirection, VocabularyItem } from '../types';
 import { vocabularyItems } from '../data/vocabulary';
 import { getStoredUsername, getStoredAvatarColor, getClientId } from '../services/username';
 import { MqttRoomRelay } from '../services/mqttRelay';
@@ -64,30 +64,60 @@ export function useRoomSocket() {
         return prev;
       }
 
-      // Guard: Prevent an older incoming packet from reverting an already-flipped card
+      // Check version order: if incoming packet is older than current local state, do not overwrite card
+      const prevVersion = prev.version ?? 0;
+      const incomingVersion = incoming.version ?? 0;
+      const isIncomingNewerOrEqual = incomingVersion >= prevVersion;
+
+      // Always merge participants to reflect all joined peers
+      const participantMap = new Map<string, RoomParticipant>();
+      (prev.participants || []).forEach((p) => participantMap.set(p.id, p));
+      (incoming.participants || []).forEach((p) => participantMap.set(p.id, p));
+      const mergedParticipants = Array.from(participantMap.values());
+
+      // Always merge messages by ID so no peer's chat or reactions are lost
+      const msgMap = new Map<string, RoomMessage>();
+      (prev.messages || []).forEach((m) => msgMap.set(m.id, m));
+      (incoming.messages || []).forEach((m) => msgMap.set(m.id, m));
+      const mergedMessages = Array.from(msgMap.values())
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .slice(-50);
+
+      // Determine activeCard
+      let resolvedCard = isIncomingNewerOrEqual ? incoming.activeCard : prev.activeCard;
+
+      // Guard: If card is the same instance and was already flipped locally, don't let un-flipped state revert it
       if (
         prev.activeCard &&
-        incoming.activeCard &&
-        prev.activeCard.cardId === incoming.activeCard.cardId &&
-        prev.activeCard.putAt === incoming.activeCard.putAt &&
+        resolvedCard &&
+        prev.activeCard.cardId === resolvedCard.cardId &&
+        prev.activeCard.putAt === resolvedCard.putAt &&
         prev.activeCard.isFlipped &&
-        !incoming.activeCard.isFlipped
+        !resolvedCard.isFlipped
       ) {
-        incoming = {
-          ...incoming,
-          activeCard: {
-            ...incoming.activeCard,
-            isFlipped: true,
-            flippedAt: prev.activeCard.flippedAt || Date.now(),
-          },
+        resolvedCard = {
+          ...resolvedCard,
+          isFlipped: true,
+          flippedAt: prev.activeCard.flippedAt || Date.now(),
         };
       }
 
-      sessionStorage.setItem('last_room_code', incoming.code);
+      const mergedState: RoomState = {
+        code: prev.code,
+        createdAt: Math.min(prev.createdAt, incoming.createdAt),
+        participants: mergedParticipants,
+        activeCard: resolvedCard,
+        historyCount: Math.max(prev.historyCount, incoming.historyCount),
+        messages: mergedMessages,
+        version: Math.max(prevVersion, incomingVersion),
+        lastUpdatedAt: Math.max(prev.lastUpdatedAt ?? 0, incoming.lastUpdatedAt ?? 0, Date.now()),
+      };
+
+      sessionStorage.setItem('last_room_code', mergedState.code);
       try {
-        localStorage.setItem(`esho_room_${incoming.code}`, JSON.stringify(incoming));
+        localStorage.setItem(`esho_room_${mergedState.code}`, JSON.stringify(mergedState));
       } catch {}
-      return incoming;
+      return mergedState;
     });
   }, []);
 
@@ -239,7 +269,6 @@ export function useRoomSocket() {
 
           if (data.type === 'ROOM_STATE') {
             applyIncomingState(data.state);
-            mqttRelayRef.current?.publishState(data.state);
             return;
           }
 
@@ -473,6 +502,7 @@ export function useRoomSocket() {
       }
 
       const myName = username || getStoredUsername() || 'শিক্ষার্থী';
+      const nextVersion = (roomState.version || 0) + 1;
       const updatedState: RoomState = {
         ...roomState,
         activeCard: {
@@ -483,6 +513,9 @@ export function useRoomSocket() {
           isFlipped: false,
           mode,
         },
+        version: nextVersion,
+        lastUpdatedAt: Date.now(),
+        lastSenderId: clientId,
         messages: [
           ...roomState.messages,
           {
@@ -514,12 +547,83 @@ export function useRoomSocket() {
               type: 'PUT_CARD',
               cardId,
               mode,
+              version: nextVersion,
             })
           );
         } catch {}
       }
     },
     [roomState, username, clientId, showError, broadcastLocal]
+  );
+
+  const refreshCard = useCallback(
+    (cardId?: string, mode?: CardDirection) => {
+      if (!roomState) return;
+
+      // Select a card (different from current if possible)
+      let chosenCardId = cardId;
+      if (!chosenCardId) {
+        const otherCards = vocabularyItems.filter((v) => v.id !== roomState.activeCard?.cardId);
+        const pool = otherCards.length > 0 ? otherCards : vocabularyItems;
+        const randomItem = pool[Math.floor(Math.random() * pool.length)];
+        chosenCardId = randomItem.id;
+      }
+
+      const cardMode = mode || roomState.activeCard?.mode || 'photo';
+      const myName = username || getStoredUsername() || 'শিক্ষার্থী';
+      const nextVersion = (roomState.version || 0) + 1;
+
+      const updatedState: RoomState = {
+        ...roomState,
+        activeCard: {
+          cardId: chosenCardId,
+          putByUserId: clientId,
+          putByUsername: myName,
+          putAt: Date.now(),
+          isFlipped: false,
+          mode: cardMode,
+        },
+        version: nextVersion,
+        lastUpdatedAt: Date.now(),
+        lastSenderId: clientId,
+        messages: [
+          ...roomState.messages,
+          {
+            id: `msg-${Date.now()}`,
+            senderId: 'system',
+            senderName: 'সিস্টেম',
+            text: `${myName} নতুন কার্ড দিয়ে টেবিল রিফ্রেশ করেছেন`,
+            type: 'system' as const,
+            timestamp: Date.now(),
+          },
+        ].slice(-50),
+      };
+
+      // 1. Instant optimistic local update
+      setRoomState(updatedState);
+      try {
+        localStorage.setItem(`esho_room_${roomState.code}`, JSON.stringify(updatedState));
+      } catch {}
+      broadcastLocal({ type: 'SYNC_STATE', code: roomState.code, state: updatedState });
+
+      // 2. High-speed MQTT dispatch to all peers
+      mqttRelayRef.current?.publishState(updatedState);
+
+      // 3. Keep WebSocket server synced if connected
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(
+            JSON.stringify({
+              type: 'REFRESH_CARD',
+              cardId: chosenCardId,
+              mode: cardMode,
+              version: nextVersion,
+            })
+          );
+        } catch {}
+      }
+    },
+    [roomState, username, clientId, broadcastLocal]
   );
 
   const flipCard = useCallback(() => {
@@ -531,6 +635,7 @@ export function useRoomSocket() {
       return;
     }
 
+    const nextVersion = (roomState.version || 0) + 1;
     const updatedState: RoomState = {
       ...roomState,
       activeCard: {
@@ -539,6 +644,9 @@ export function useRoomSocket() {
         flippedAt: Date.now(),
       },
       historyCount: roomState.historyCount + 1,
+      version: nextVersion,
+      lastUpdatedAt: Date.now(),
+      lastSenderId: clientId,
       messages: [
         ...roomState.messages,
         {
@@ -568,6 +676,7 @@ export function useRoomSocket() {
         wsRef.current.send(
           JSON.stringify({
             type: 'FLIP_CARD',
+            version: nextVersion,
           })
         );
       } catch {}
@@ -577,9 +686,13 @@ export function useRoomSocket() {
   const clearCard = useCallback(() => {
     if (!roomState || !roomState.activeCard) return;
 
+    const nextVersion = (roomState.version || 0) + 1;
     const updatedState: RoomState = {
       ...roomState,
       activeCard: null,
+      version: nextVersion,
+      lastUpdatedAt: Date.now(),
+      lastSenderId: clientId,
     };
 
     // 1. Instant optimistic local update
@@ -598,19 +711,24 @@ export function useRoomSocket() {
         wsRef.current.send(
           JSON.stringify({
             type: 'CLEAR_CARD',
+            version: nextVersion,
           })
         );
       } catch {}
     }
-  }, [roomState, broadcastLocal]);
+  }, [roomState, broadcastLocal, clientId]);
 
   const sendMessage = useCallback(
     (text: string, messageType: 'chat' | 'reaction' = 'chat') => {
       if (!roomState || !text.trim()) return;
 
       const myName = username || getStoredUsername() || 'শিক্ষার্থী';
+      const nextVersion = (roomState.version || 0) + 1;
       const updatedState: RoomState = {
         ...roomState,
+        version: nextVersion,
+        lastUpdatedAt: Date.now(),
+        lastSenderId: clientId,
         messages: [
           ...roomState.messages,
           {
@@ -642,6 +760,7 @@ export function useRoomSocket() {
               type: 'SEND_MESSAGE',
               text: text.trim(),
               messageType,
+              version: nextVersion,
             })
           );
         } catch {}
@@ -649,6 +768,43 @@ export function useRoomSocket() {
     },
     [roomState, username, clientId, broadcastLocal]
   );
+
+  const syncRoom = useCallback(async () => {
+    if (!roomState) return;
+
+    // 1. Request latest snapshot from WebSocket server
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'SYNC_ROOM',
+          })
+        );
+      } catch {}
+    }
+
+    // 2. Request latest retained snapshot from MQTT
+    mqttRelayRef.current?.requestSync(roomState.code);
+
+    // 3. Check BroadcastChannel for active peers
+    if (bcRef.current) {
+      bcRef.current.postMessage({
+        type: 'REQUEST_STATE',
+        roomCode: roomState.code,
+      });
+    }
+
+    // 4. Check localStorage fallback
+    try {
+      const stored = localStorage.getItem(`esho_room_${roomState.code}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.code === roomState.code) {
+          applyIncomingState(parsed);
+        }
+      }
+    } catch {}
+  }, [roomState, applyIncomingState]);
 
   const leaveRoom = useCallback(() => {
     if (!roomState) return;
@@ -716,6 +872,8 @@ export function useRoomSocket() {
     createRoom,
     joinRoom,
     putCard,
+    refreshCard,
+    syncRoom,
     flipCard,
     clearCard,
     sendMessage,

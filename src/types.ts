@@ -36,6 +36,9 @@ export interface RoomState {
   activeCard: PlacedCard | null;
   historyCount: number;
   messages: RoomMessage[];
+  version?: number;
+  lastUpdatedAt?: number;
+  lastSenderId?: string;
 }
 
 export interface Chapter {

@@ -47,6 +47,8 @@ export const CollaborativeRoom: React.FC = () => {
     createRoom,
     joinRoom,
     putCard,
+    refreshCard,
+    syncRoom,
     flipCard,
     clearCard,
     sendMessage,
@@ -62,6 +64,25 @@ export const CollaborativeRoom: React.FC = () => {
   const [chatInput, setChatInput] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [cardShake, setCardShake] = useState(false);
+  const [isRefreshingCard, setIsRefreshingCard] = useState(false);
+  const [isSyncingRoom, setIsSyncingRoom] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+
+  const handleRefreshNewCard = () => {
+    setIsRefreshingCard(true);
+    refreshCard();
+    setTimeout(() => setIsRefreshingCard(false), 500);
+  };
+
+  const handleSyncRoom = async () => {
+    setIsSyncingRoom(true);
+    await syncRoom();
+    setSyncToast('রুমের তথ্য সফলভাবে সিঙ্ক হয়েছে!');
+    setTimeout(() => {
+      setIsSyncingRoom(false);
+      setSyncToast(null);
+    }, 2000);
+  };
 
   // Check URL query param for ?room=CODE
   useEffect(() => {
@@ -421,6 +442,16 @@ export const CollaborativeRoom: React.FC = () => {
 
               <div className="flex items-center gap-1.5">
                 <button
+                  onClick={handleSyncRoom}
+                  disabled={isSyncingRoom}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold font-bengali transition flex items-center gap-1.5 border border-stone-200 min-h-[36px] active:scale-95"
+                  title="রুমের অবস্থা সিঙ্ক করুন"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 ${isSyncingRoom ? 'animate-spin text-emerald-600' : ''}`} />
+                  <span className="hidden xs:inline">{isSyncingRoom ? 'সিঙ্ক হচ্ছে...' : 'সিঙ্ক'}</span>
+                </button>
+
+                <button
                   onClick={() => setIsChatOpen(!isChatOpen)}
                   className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold font-bengali flex items-center gap-1.5 transition border min-h-[36px] ${
                     isChatOpen
@@ -443,6 +474,14 @@ export const CollaborativeRoom: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Sync Success Toast */}
+          {syncToast && (
+            <div className="px-4 py-2 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-bengali font-semibold flex items-center justify-center gap-2 shadow-xs transition animate-fade-in">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span>{syncToast}</span>
+            </div>
+          )}
 
           {/* Quick Reaction Bar */}
           <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-stone-100/80 rounded-2xl border border-stone-200 overflow-x-auto scrollbar-none touch-pan-x">
@@ -492,14 +531,28 @@ export const CollaborativeRoom: React.FC = () => {
                 )}
               </div>
 
-              {roomState.activeCard && (
-                <div className="text-[11px] sm:text-xs text-stone-300 font-bengali flex items-center gap-1.5">
-                  <span className="hidden xs:inline">কার্ড প্রদানকারী:</span>
-                  <span className="font-bold text-amber-300 bg-stone-800 px-2 sm:px-2.5 py-0.5 rounded-lg border border-stone-700">
-                    {roomState.activeCard.putByUsername} {isMyCard ? '(আপনি)' : ''}
-                  </span>
-                </div>
-              )}
+              {/* Action buttons & Card Author on Stage Top Bar */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRefreshNewCard}
+                  disabled={isRefreshingCard}
+                  className="px-2.5 sm:px-3 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white text-[11px] sm:text-xs font-semibold font-bengali border border-stone-700 hover:border-stone-600 transition flex items-center gap-1.5 active:scale-95 shadow-xs"
+                  title="টেবিলে নতুন কার্ড এনে রিফ্রেশ করুন"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 text-emerald-400 ${isRefreshingCard ? 'animate-spin' : ''}`} />
+                  <span>নতুন কার্ড রিফ্রেশ</span>
+                </button>
+
+                {roomState.activeCard && (
+                  <div className="text-[11px] sm:text-xs text-stone-300 font-bengali flex items-center gap-1.5">
+                    <span className="hidden xs:inline">কার্ড প্রদানকারী:</span>
+                    <span className="font-bold text-amber-300 bg-stone-800 px-2 sm:px-2.5 py-0.5 rounded-lg border border-stone-700">
+                      {roomState.activeCard.putByUsername} {isMyCard ? '(আপনি)' : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* STAGE MAIN CONTENT: CARD OR EMPTY STATE */}
@@ -828,24 +881,36 @@ export const CollaborativeRoom: React.FC = () => {
 
                 {/* STAGE ACTION CONTROLS */}
                 <div className="mt-4 sm:mt-5 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 w-full">
-                  {/* Flip Button */}
+                  {/* Flip or Refresh Action Controls */}
                   {!roomState.activeCard.isFlipped ? (
-                    canFlip ? (
+                    <div className="flex flex-wrap items-stretch sm:items-center justify-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+                      {canFlip ? (
+                        <button
+                          onClick={flipCard}
+                          className="flex-1 sm:flex-initial min-h-[46px] py-2.5 px-6 sm:px-8 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-bengali shadow-lg shadow-emerald-950/40 transition flex items-center justify-center gap-2 text-sm sm:text-base animate-pulse active:scale-95"
+                        >
+                          <RotateCw className="w-5 h-5" />
+                          <span>কার্ডটি উল্টান (Flip Card)</span>
+                        </button>
+                      ) : (
+                        <div className="flex-1 sm:flex-initial py-2.5 px-4 rounded-xl bg-stone-800/80 border border-stone-700 text-stone-400 font-bengali text-xs flex items-center justify-center gap-2 min-h-[46px]">
+                          <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>
+                            শুধুমাত্র <strong>{roomState.activeCard.putByUsername}</strong> কার্ডটি উল্টাতে পারবেন
+                          </span>
+                        </div>
+                      )}
+
                       <button
-                        onClick={flipCard}
-                        className="w-full sm:w-auto min-h-[48px] py-3 px-6 sm:px-8 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-bengali shadow-lg shadow-emerald-950/40 transition flex items-center justify-center gap-2 text-sm sm:text-base animate-pulse active:scale-95"
+                        onClick={handleRefreshNewCard}
+                        disabled={isRefreshingCard}
+                        className="py-2.5 px-3.5 sm:px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white font-semibold font-bengali border border-stone-700 transition flex items-center justify-center gap-1.5 text-xs sm:text-sm min-h-[46px] active:scale-95"
+                        title="টেবিলে সরাসরি নতুন কার্ড এনে রিফ্রেশ করুন"
                       >
-                        <RotateCw className="w-5 h-5" />
-                        <span>কার্ডটি উল্টান (Flip Card)</span>
+                        <RotateCw className={`w-4 h-4 text-emerald-400 ${isRefreshingCard ? 'animate-spin' : ''}`} />
+                        <span>নতুন কার্ড রিফ্রেশ</span>
                       </button>
-                    ) : (
-                      <div className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-stone-800/80 border border-stone-700 text-stone-400 font-bengali text-xs flex items-center justify-center gap-2">
-                        <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span>
-                          শুধুমাত্র <strong>{roomState.activeCard.putByUsername}</strong> কার্ডটি উল্টাতে পারবেন
-                        </span>
-                      </div>
-                    )
+                    </div>
                   ) : (
                     /* When Flipped: Next Card Actions for ANYONE in the room */
                     <div className="flex flex-wrap items-stretch sm:items-center justify-center gap-2 sm:gap-2.5 w-full sm:w-auto">
@@ -855,6 +920,15 @@ export const CollaborativeRoom: React.FC = () => {
                       >
                         <Plus className="w-4 h-4" />
                         <span>পরবর্তী কার্ড রাখুন</span>
+                      </button>
+                      <button
+                        onClick={handleRefreshNewCard}
+                        disabled={isRefreshingCard}
+                        className="flex-1 sm:flex-initial py-2.5 px-3.5 sm:px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold font-bengali shadow transition flex items-center justify-center gap-1.5 text-xs sm:text-sm min-h-[42px] active:scale-95"
+                        title="তাৎক্ষণিকভাবে নতুন র‍্যান্ডম কার্ড দিয়ে টেবিল রিফ্রেশ করুন"
+                      >
+                        <RotateCw className={`w-4 h-4 ${isRefreshingCard ? 'animate-spin' : ''}`} />
+                        <span>রিফ্রেশ (নতুন কার্ড)</span>
                       </button>
                       <button
                         onClick={() => handlePutRandom('photo')}
