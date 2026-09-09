@@ -564,7 +564,7 @@ export const CollaborativeRoom: React.FC = () => {
 
                 {/* THE 3D FLIP CARD CONTAINER */}
                 <div
-                  key={`${roomState.activeCard.cardId}_${roomState.activeCard.putAt}_${roomState.activeCard.isFlipped ? 'flipped' : 'front'}`}
+                  key={`table-card-${roomState.activeCard.cardId}-${roomState.activeCard.putAt}`}
                   id={`room-card-${activeCardItem.id}`}
                   onClick={handleCardClick}
                   className={`relative w-full min-h-[460px] h-[500px] sm:h-[580px] rounded-2xl sm:rounded-3xl transition-transform duration-500 transform-style-3d shadow-2xl border ${

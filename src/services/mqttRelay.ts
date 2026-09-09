@@ -7,17 +7,31 @@ interface PendingJoin {
   timer: number;
 }
 
+interface BrokerConfig {
+  name: string;
+  host: string;
+  port: number;
+  path: string;
+}
+
+const BROKERS: BrokerConfig[] = [
+  { name: 'EMQX Edge (High Speed)', host: 'broker.emqx.io', port: 8084, path: '/mqtt' },
+  { name: 'HiveMQ (Backup)', host: 'broker.hivemq.com', port: 8884, path: '/mqtt' },
+];
+
 export class MqttRoomRelay {
   private client: Paho.Client | null = null;
   private currentRoomCode: string | null = null;
   private clientId: string;
   private isConnecting = false;
   private isConnected = false;
+  private activeBrokerIndex = 0;
   private onStateCallback: ((state: RoomState) => void) | null = null;
   private onStatusChangeCallback: ((status: 'connected' | 'connecting' | 'disconnected') => void) | null = null;
   private pendingPublishState: RoomState | null = null;
   private pendingJoins = new Map<string, PendingJoin>();
   private pingInterval: number | null = null;
+  private lastMessageTimestamp = 0;
 
   constructor(clientId: string) {
     this.clientId = `esho_${clientId.replace(/[^a-zA-Z0-9]/g, '').slice(-8)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -48,7 +62,7 @@ export class MqttRoomRelay {
           if (!this.isConnecting) {
             window.clearInterval(check);
             resolve(this.isConnected);
-          } else if (attempts > 50) {
+          } else if (attempts > 40) {
             window.clearInterval(check);
             resolve(false);
           }
@@ -59,10 +73,11 @@ export class MqttRoomRelay {
     this.isConnecting = true;
     this.onStatusChangeCallback?.('connecting');
 
+    const broker = BROKERS[this.activeBrokerIndex];
+
     return new Promise((resolve) => {
       try {
-        // High-availability public MQTT broker with full WSS support
-        const client = new Paho.Client('broker.hivemq.com', 8884, '/mqtt', this.clientId);
+        const client = new Paho.Client(broker.host, broker.port, broker.path, this.clientId);
         this.client = client;
 
         client.onConnectionLost = (responseObject) => {
@@ -74,11 +89,11 @@ export class MqttRoomRelay {
             this.pingInterval = null;
           }
           if (responseObject.errorCode !== 0) {
-            console.warn('[MQTT Relay] Connection lost:', responseObject.errorMessage);
-            // Auto reconnect after brief delay
+            console.warn(`[MQTT Relay] Connection lost on ${broker.name}:`, responseObject.errorMessage);
+            // Reconnect after brief delay
             window.setTimeout(() => {
               this.connect();
-            }, 3000);
+            }, 2000);
           }
         };
 
@@ -88,7 +103,7 @@ export class MqttRoomRelay {
 
         client.connect({
           useSSL: true,
-          timeout: 6,
+          timeout: 4,
           keepAliveInterval: 30,
           cleanSession: true,
           onSuccess: () => {
@@ -101,7 +116,6 @@ export class MqttRoomRelay {
             this.pingInterval = window.setInterval(() => {
               if (this.client?.isConnected() && this.currentRoomCode) {
                 try {
-                  // Lightweight ping
                   const pTopic = `esho_arabi_v3/ping_${this.clientId}`;
                   const pMsg = new Paho.Message('1');
                   pMsg.destinationName = pTopic;
@@ -114,7 +128,7 @@ export class MqttRoomRelay {
             // Re-subscribe if we already have an active room
             if (this.currentRoomCode) {
               const topic = this.getTopic(this.currentRoomCode);
-              client.subscribe(topic, { qos: 1 });
+              client.subscribe(topic, { qos: 0 });
             }
 
             // Flush pending state publish
@@ -126,11 +140,20 @@ export class MqttRoomRelay {
             resolve(true);
           },
           onFailure: (err) => {
-            console.warn('[MQTT Relay] Failed to connect to HiveMQ broker:', err.errorMessage);
+            console.warn(`[MQTT Relay] Failed to connect to ${broker.name}:`, err.errorMessage);
             this.isConnected = false;
             this.isConnecting = false;
-            this.onStatusChangeCallback?.('disconnected');
-            resolve(false);
+
+            // Try fallback broker if primary failed
+            if (this.activeBrokerIndex < BROKERS.length - 1) {
+              this.activeBrokerIndex += 1;
+              console.log(`[MQTT Relay] Switching to ${BROKERS[this.activeBrokerIndex].name}...`);
+              this.connect().then(resolve);
+            } else {
+              this.activeBrokerIndex = 0;
+              this.onStatusChangeCallback?.('disconnected');
+              resolve(false);
+            }
           },
         });
       } catch (err) {
@@ -175,7 +198,7 @@ export class MqttRoomRelay {
         pendingJoin.onFound(roomState);
       }
 
-      // 2. Broadcast to global UI state handler
+      // 2. Broadcast immediately to UI state handler
       this.onStateCallback?.(roomState);
     } catch (e) {
       console.error('[MQTT Relay] Failed to parse message:', e);
@@ -194,7 +217,7 @@ export class MqttRoomRelay {
 
     const topic = this.getTopic(cleanCode);
     this.client.subscribe(topic, {
-      qos: 1,
+      qos: 0,
       onSuccess: () => {
         this.publishState(initialState);
       },
@@ -217,18 +240,16 @@ export class MqttRoomRelay {
       return;
     }
 
-    // Cancel existing pending join for this code if any
     const existing = this.pendingJoins.get(cleanCode);
     if (existing) {
       window.clearTimeout(existing.timer);
       this.pendingJoins.delete(cleanCode);
     }
 
-    // Set 8-second timeout for mobile networks
     const timer = window.setTimeout(() => {
       this.pendingJoins.delete(cleanCode);
       onNotFound();
-    }, 8000);
+    }, 6000);
 
     this.pendingJoins.set(cleanCode, {
       onFound,
@@ -238,7 +259,7 @@ export class MqttRoomRelay {
 
     const topic = this.getTopic(cleanCode);
     this.client.subscribe(topic, {
-      qos: 1,
+      qos: 0,
       onFailure: () => {
         const pending = this.pendingJoins.get(cleanCode);
         if (pending) {
@@ -259,11 +280,20 @@ export class MqttRoomRelay {
     try {
       const topic = this.getTopic(state.code);
       const payload = JSON.stringify(state);
-      const message = new Paho.Message(payload);
-      message.destinationName = topic;
-      message.retained = true; // Retain message so new participants receive it instantly upon subscribing
-      message.qos = 1;
-      this.client.send(message);
+
+      // 1. Lightning-fast in-memory dispatch to currently active players (<150ms roundtrip)
+      const instantMsg = new Paho.Message(payload);
+      instantMsg.destinationName = topic;
+      instantMsg.retained = false;
+      instantMsg.qos = 0;
+      this.client.send(instantMsg);
+
+      // 2. Retained snapshot for new players who join the room later
+      const retainedMsg = new Paho.Message(payload);
+      retainedMsg.destinationName = topic;
+      retainedMsg.retained = true;
+      retainedMsg.qos = 1;
+      this.client.send(retainedMsg);
     } catch (e) {
       console.error('[MQTT Relay] Failed to publish state:', e);
     }
