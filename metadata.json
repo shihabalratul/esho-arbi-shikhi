@@ -1,0 +1,6 @@
+{
+  "name": "Arabic Bangla Flashcards",
+  "description": "Interactive photo flashcards and real-time collaborative practice rooms for learning Arabic from Bangla, featuring Esho Arabi Shikhi book chapters, example sentences, and shared flip cards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
