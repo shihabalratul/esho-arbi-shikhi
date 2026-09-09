@@ -59,19 +59,18 @@
 ### 1. Collaborative Practice Room Rules & Workflow
 1. **Putting Cards**: Anyone can put a card on the table if the table is empty or the previous card has been flipped.
 2. **Card Ownership & Flip Locking**: Only the participant who put the card can flip it (`putByUserId === clientId`). Other participants see the card locked with the owner's name to foster active turn-taking and verbal quizzing.
-3. **Open Round Completion**: Once flipped, the correct answer and example sentences are revealed to everyone. Anyone in the room can then place the next card, pick a random card, refresh, or clear the table.
-4. **Instant Card Refresh (নতুন কার্ড রিফ্রেশ)**:
-   - A dedicated **"রিফ্রেশ (নতুন কার্ড)"** button is accessible at all times in the room header and stage controls.
-   - If a round gets stalled or participants wish to change the card without waiting, clicking the refresh button immediately deals a new card to everyone in the room and updates the sequence version.
+3. **Open Round Completion**: Once flipped, the correct answer and example sentences are revealed to everyone. Anyone in the room can then place the next card, pick a random card, or clear the table.
+4. **Earlier Action Conflict Resolution**: If two participants perform an action concurrently (such as putting different cards simultaneously), the earlier action (earliest `putAt` timestamp) strictly wins the conflict, and that winning state is automatically synchronized to everyone's side.
 5. **Room Codes & Direct Links**: Rooms are identified by a 6-character code (e.g. `AR8K29`) and shareable link (`?room=AR8K29`). Opening a share link automatically opens the username prompt if not set and joins the session.
 
 ### 2. Multi-Device Synchronization & Zero-Latency State Engine
-- **Sequence Versioning (`version`)**: Every room state mutation (card placement, flip, refresh, message, clear) increments a monotonic `version` number. Incoming packets with older versions are automatically rejected to prevent out-of-order rollbacks and race conditions.
+- **Sequence Versioning (`version`)**: Every room state mutation (card placement, flip, message, clear) increments a monotonic `version` number. Incoming packets with older versions are automatically rejected to prevent out-of-order rollbacks.
+- **Manual State Sync (`syncRoom`)**: A dedicated **"সিঙ্ক"** button in the room header forces an immediate re-subscription to the broker's retained snapshot and requests an updated state from the server.
 - **Flip Protection Guard**: An already flipped card on a client will never be flipped back to un-flipped by a delayed packet.
 - **Echo Suppression**: Self-published MQTT messages are identified via `_senderId` and ignored to prevent overwriting optimistic local state.
 - **Message Union Merging**: Chat and reaction messages are merged by unique IDs across both clients so no messages are lost.
 - **Single Retained MQTT Publish**: Eliminates duplicate packets and broker congestion by sending a single retained message (`qos: 0, retained: true`) on topic `esho_arabi_v3/room_{CODE}`.
-- **Manual State Sync (`syncRoom`)**: Clicking the **"সিঙ্ক"** button in the room header forces an immediate re-subscription to the broker's retained snapshot and requests an updated state from the server.
+- **2-Second Keepalive Ping**: A high-frequency background heartbeat ping runs every 2 seconds across WebSockets and MQTT to keep real-time sockets warm and responsive against mobile cellular idle timeouts.
 
 ### 3. Textbook Vocabulary Data Integrity
 - All vocabulary items, transliterations, Bangla translations, example phrases, and categories are strictly derived from the authentic "এসো আরবী শিখি" textbook curriculum.

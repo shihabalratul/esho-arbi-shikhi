@@ -104,14 +104,14 @@ export class MqttRoomRelay {
         client.connect({
           useSSL: true,
           timeout: 4,
-          keepAliveInterval: 30,
+          keepAliveInterval: 2,
           cleanSession: true,
           onSuccess: () => {
             this.isConnected = true;
             this.isConnecting = false;
             this.onStatusChangeCallback?.('connected');
 
-            // Keepalive ping for mobile cellular networks
+            // Keepalive ping every 2 seconds
             if (this.pingInterval) window.clearInterval(this.pingInterval);
             this.pingInterval = window.setInterval(() => {
               if (this.client?.isConnected() && this.currentRoomCode) {
@@ -123,7 +123,7 @@ export class MqttRoomRelay {
                   this.client.send(pMsg);
                 } catch {}
               }
-            }, 25000);
+            }, 2000);
 
             // Re-subscribe if we already have an active room
             if (this.currentRoomCode) {

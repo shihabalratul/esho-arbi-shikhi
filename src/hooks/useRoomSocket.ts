@@ -83,8 +83,56 @@ export function useRoomSocket() {
         .sort((a, b) => a.timestamp - b.timestamp)
         .slice(-50);
 
-      // Determine activeCard
-      let resolvedCard = isIncomingNewerOrEqual ? incoming.activeCard : prev.activeCard;
+      // Determine activeCard:
+      // If there is conflict between two users' actions, the earlier action (earliest putAt timestamp) wins and syncs to everyone.
+      let resolvedCard = prev.activeCard;
+      let shouldRebroadcastWinner = false;
+
+      if (!prev.activeCard && incoming.activeCard) {
+        resolvedCard = incoming.activeCard;
+      } else if (prev.activeCard && !incoming.activeCard) {
+        resolvedCard = isIncomingNewerOrEqual ? null : prev.activeCard;
+        if (!isIncomingNewerOrEqual) {
+          shouldRebroadcastWinner = true;
+        }
+      } else if (prev.activeCard && incoming.activeCard) {
+        if (
+          prev.activeCard.cardId === incoming.activeCard.cardId &&
+          prev.activeCard.putAt === incoming.activeCard.putAt
+        ) {
+          // Same card instance: once flipped by anyone, it must stay flipped
+          const isFlipped = prev.activeCard.isFlipped || incoming.activeCard.isFlipped;
+          resolvedCard = {
+            ...(isIncomingNewerOrEqual ? incoming.activeCard : prev.activeCard),
+            isFlipped,
+            flippedAt: prev.activeCard.flippedAt || incoming.activeCard.flippedAt,
+          };
+        } else {
+          // Different cards placed concurrently by different users!
+          // CONFLICT RESOLUTION: The earlier action (smaller putAt timestamp) wins.
+          const prevPutAt = prev.activeCard.putAt || 0;
+          const incomingPutAt = incoming.activeCard.putAt || 0;
+
+          if (incomingPutAt < prevPutAt) {
+            // Incoming action happened earlier! Incoming wins.
+            resolvedCard = incoming.activeCard;
+          } else if (prevPutAt < incomingPutAt) {
+            // Local action happened earlier! Local earlier action wins and must be synced to others.
+            resolvedCard = prev.activeCard;
+            shouldRebroadcastWinner = true;
+          } else {
+            // Exactly equal timestamp tie-break: compare user IDs deterministically
+            if (prev.activeCard.putByUserId <= incoming.activeCard.putByUserId) {
+              resolvedCard = prev.activeCard;
+              shouldRebroadcastWinner = true;
+            } else {
+              resolvedCard = incoming.activeCard;
+            }
+          }
+        }
+      } else {
+        resolvedCard = null;
+      }
 
       // Guard: If card is the same instance and was already flipped locally, don't let un-flipped state revert it
       if (
@@ -102,6 +150,8 @@ export function useRoomSocket() {
         };
       }
 
+      const mergedVersion = Math.max(prevVersion, incomingVersion) + (shouldRebroadcastWinner ? 1 : 0);
+
       const mergedState: RoomState = {
         code: prev.code,
         createdAt: Math.min(prev.createdAt, incoming.createdAt),
@@ -109,9 +159,17 @@ export function useRoomSocket() {
         activeCard: resolvedCard,
         historyCount: Math.max(prev.historyCount, incoming.historyCount),
         messages: mergedMessages,
-        version: Math.max(prevVersion, incomingVersion),
+        version: mergedVersion,
         lastUpdatedAt: Math.max(prev.lastUpdatedAt ?? 0, incoming.lastUpdatedAt ?? 0, Date.now()),
       };
+
+      if (shouldRebroadcastWinner) {
+        setTimeout(() => {
+          if (mqttRelayRef.current) {
+            mqttRelayRef.current.publishState(mergedState);
+          }
+        }, 60);
+      }
 
       sessionStorage.setItem('last_room_code', mergedState.code);
       try {
@@ -227,13 +285,13 @@ export function useRoomSocket() {
         setConnectionStatus('connected');
         setIsFallbackMode(false);
 
-        // Start ping heartbeat every 25 seconds
+        // Start ping heartbeat every 2 seconds
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = window.setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'PING' }));
           }
-        }, 25000);
+        }, 2000);
 
         // If we were previously in a room, re-join seamlessly
         const lastRoom = sessionStorage.getItem('last_room_code');
