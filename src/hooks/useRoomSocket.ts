@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { RoomState, RoomMessage, CardDirection, VocabularyItem } from '../types';
+import { RoomState, CardDirection, VocabularyItem } from '../types';
 import { vocabularyItems } from '../data/vocabulary';
 import { getStoredUsername, getStoredAvatarColor, getClientId } from '../services/username';
 import { MqttRoomRelay } from '../services/mqttRelay';
@@ -7,8 +7,12 @@ import { MqttRoomRelay } from '../services/mqttRelay';
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
 
 export function useRoomSocket() {
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
-  const [isFallbackMode, setIsFallbackMode] = useState<boolean>(false);
+  const isVercel =
+    typeof window !== 'undefined' &&
+    (window.location.hostname.endsWith('vercel.app') || window.location.hostname.includes('vercel'));
+
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [isFallbackMode, setIsFallbackMode] = useState<boolean>(isVercel);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [username, setUsernameState] = useState<string>(() => getStoredUsername());
@@ -18,9 +22,7 @@ export function useRoomSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const mqttRelayRef = useRef<MqttRoomRelay | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
   const pingIntervalRef = useRef<number | null>(null);
-  const failedAttemptsRef = useRef<number>(0);
 
   // Initialize MQTT Relay instance
   if (!mqttRelayRef.current) {
@@ -36,7 +38,7 @@ export function useRoomSocket() {
   }, []);
 
   // Broadcast helper for local fallback between tabs
-  const broadcastLocal = useCallback((action: any) => {
+  const broadcastLocal = useCallback((action: { type: string; code?: string; state?: RoomState }) => {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       if (!bcRef.current) {
         bcRef.current = new BroadcastChannel('esho_arabi_room_sync');
@@ -71,7 +73,7 @@ export function useRoomSocket() {
       (newState: RoomState) => {
         applyIncomingState(newState);
       },
-      (newStatus: 'connected' | 'connecting' | 'disconnected') => {
+      (newStatus: ConnectionStatus) => {
         if (isFallbackMode) {
           setConnectionStatus(newStatus);
         }
@@ -109,7 +111,6 @@ export function useRoomSocket() {
   // Switch to cloud relay (for Vercel / serverless / static hosting)
   const activateCloudRelay = useCallback(() => {
     setIsFallbackMode(true);
-    setConnectionStatus('connecting');
     const relay = mqttRelayRef.current;
     if (!relay) return;
 
@@ -124,7 +125,6 @@ export function useRoomSocket() {
             applyIncomingState(state);
           },
           () => {
-            // Room might have expired; clear last code
             sessionStorage.removeItem('last_room_code');
           }
         );
@@ -134,6 +134,13 @@ export function useRoomSocket() {
 
   const connect = useCallback(() => {
     if (typeof window === 'undefined') return;
+
+    // On Vercel, server.ts does not run, so skip /ws immediately
+    if (isVercel) {
+      activateCloudRelay();
+      return;
+    }
+
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -144,14 +151,24 @@ export function useRoomSocket() {
     const host = window.location.host;
     const wsUrl = `${protocol}//${host}/ws`;
 
+    // Fast-fail timeout for WebSocket if local server does not answer
+    const connectionTimeout = window.setTimeout(() => {
+      if (wsRef.current && wsRef.current.readyState !== WebSocket.OPEN) {
+        try {
+          wsRef.current.close();
+        } catch {}
+        activateCloudRelay();
+      }
+    }, 2000);
+
     try {
       const socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
       socket.onopen = () => {
+        window.clearTimeout(connectionTimeout);
         setConnectionStatus('connected');
         setIsFallbackMode(false);
-        failedAttemptsRef.current = 0;
 
         // Start ping heartbeat every 25 seconds
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
@@ -226,30 +243,27 @@ export function useRoomSocket() {
       };
 
       socket.onclose = () => {
+        window.clearTimeout(connectionTimeout);
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-        failedAttemptsRef.current += 1;
-
-        // If local server connection fails (such as on Vercel / static hosting where /ws does not exist)
         activateCloudRelay();
       };
 
       socket.onerror = () => {
-        failedAttemptsRef.current += 1;
+        window.clearTimeout(connectionTimeout);
         activateCloudRelay();
         try {
           socket.close();
         } catch {}
       };
     } catch {
-      failedAttemptsRef.current += 1;
+      window.clearTimeout(connectionTimeout);
       activateCloudRelay();
     }
-  }, [clientId, showError, activateCloudRelay]);
+  }, [clientId, showError, activateCloudRelay, isVercel]);
 
   useEffect(() => {
     connect();
     return () => {
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {
         wsRef.current.close();
@@ -578,15 +592,12 @@ export function useRoomSocket() {
   );
 
   const leaveRoom = useCallback(() => {
-    const currentCode = roomState?.code;
-    sessionStorage.removeItem('last_room_code');
+    if (!roomState) return;
+    const currentCode = roomState.code;
 
-    if (roomState && isFallbackMode) {
+    if (isFallbackMode) {
       const remainingParticipants = roomState.participants.filter((p) => p.id !== clientId);
       if (remainingParticipants.length > 0) {
-        if (!remainingParticipants.some((p) => p.isHost)) {
-          remainingParticipants[0].isHost = true;
-        }
         const updatedState: RoomState = {
           ...roomState,
           participants: remainingParticipants,

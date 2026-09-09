@@ -56,6 +56,7 @@ export const CollaborativeRoom: React.FC = () => {
   const [inputCode, setInputCode] = useState('');
   const [isCardSelectorOpen, setIsCardSelectorOpen] = useState(false);
   const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'create' | { type: 'join'; code: string } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -68,11 +69,13 @@ export const CollaborativeRoom: React.FC = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const roomParam = urlParams.get('room');
       if (roomParam) {
-        setInputCode(roomParam.toUpperCase());
+        const cleanParam = roomParam.trim().toUpperCase();
+        setInputCode(cleanParam);
         if (!username) {
+          setPendingAction({ type: 'join', code: cleanParam });
           setIsUsernameModalOpen(true);
         } else {
-          joinRoom(roomParam);
+          joinRoom(cleanParam);
         }
       }
     }
@@ -141,12 +144,23 @@ export const CollaborativeRoom: React.FC = () => {
       {/* Username Setup Modal */}
       <UsernameModal
         isOpen={isUsernameModalOpen}
-        onClose={() => setIsUsernameModalOpen(false)}
+        onClose={() => {
+          setIsUsernameModalOpen(false);
+          setPendingAction(null);
+        }}
         initialUsername={username}
         initialColor={avatarColor}
         onSave={(name, color) => {
           setUsernameState(name);
           setAvatarColorState(color);
+          setIsUsernameModalOpen(false);
+          if (pendingAction === 'create') {
+            createRoom(name, color);
+            setPendingAction(null);
+          } else if (pendingAction && typeof pendingAction === 'object' && pendingAction.type === 'join') {
+            joinRoom(pendingAction.code, name, color);
+            setPendingAction(null);
+          }
         }}
       />
 
@@ -231,12 +245,12 @@ export const CollaborativeRoom: React.FC = () => {
               <button
                 onClick={() => {
                   if (!username) {
+                    setPendingAction('create');
                     setIsUsernameModalOpen(true);
                   } else {
                     createRoom();
                   }
                 }}
-                disabled={connectionStatus === 'connecting'}
                 className="w-full py-3.5 px-5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold font-bengali shadow-md transition flex items-center justify-center gap-2 hover:shadow-lg active:scale-[0.99]"
               >
                 <Plus className="w-5 h-5" />
@@ -270,17 +284,19 @@ export const CollaborativeRoom: React.FC = () => {
                   />
                   <button
                     onClick={() => {
-                      if (!inputCode.trim()) {
+                      const codeToJoin = inputCode.trim();
+                      if (!codeToJoin) {
                         showError('দয়া করে রুম কোড লিখুন');
                         return;
                       }
                       if (!username) {
+                        setPendingAction({ type: 'join', code: codeToJoin });
                         setIsUsernameModalOpen(true);
                       } else {
-                        joinRoom(inputCode);
+                        joinRoom(codeToJoin);
                       }
                     }}
-                    disabled={!inputCode.trim() || connectionStatus === 'connecting'}
+                    disabled={!inputCode.trim()}
                     className={`px-5 py-3 rounded-2xl font-semibold font-bengali shadow-sm transition flex items-center justify-center gap-2 min-h-[46px] active:scale-95 ${
                       inputCode.trim()
                         ? 'bg-amber-600 hover:bg-amber-700 text-white'
@@ -548,6 +564,7 @@ export const CollaborativeRoom: React.FC = () => {
 
                 {/* THE 3D FLIP CARD CONTAINER */}
                 <div
+                  key={`${roomState.activeCard.cardId}_${roomState.activeCard.putAt}_${roomState.activeCard.isFlipped ? 'flipped' : 'front'}`}
                   id={`room-card-${activeCardItem.id}`}
                   onClick={handleCardClick}
                   className={`relative w-full min-h-[460px] h-[500px] sm:h-[580px] rounded-2xl sm:rounded-3xl transition-transform duration-500 transform-style-3d shadow-2xl border ${
