@@ -8,8 +8,6 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  Menu,
   Layers,
   Shuffle,
   Bookmark,
@@ -46,7 +44,6 @@ export default function App() {
   const [onlyPhotoItems, setOnlyPhotoItems] = useState<boolean>(false);
   const [onlyBookmarked, setOnlyBookmarked] = useState<boolean>(false);
   const [onlyMastered, setOnlyMastered] = useState<boolean>(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // Lessons available under currently selected unit
   const availableLessons = useMemo(() => {
@@ -130,14 +127,7 @@ export default function App() {
     if (direction) {
       setCardDirection(direction);
     }
-    setIsMobileMenuOpen(false);
   }, []);
-
-  const activeModeObj = useMemo(() => {
-    return (
-      studyModesList.find((m) => isModeActive(m.id, m.direction)) || studyModesList[0]
-    );
-  }, [studyModesList, isModeActive]);
 
   // Card browser state
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -306,25 +296,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* Header Actions (Bookmarks, Mastered, and Mobile Menu Toggle) */}
+          {/* Header Quick Actions (Bookmarks & Mastered Filters) */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Active Mode indicator badge on mobile */}
-            <button
-              id="btn-active-mode-indicator"
-              onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-              className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-bengali font-semibold transition hover:bg-emerald-100"
-              title="মোড পরিবর্তন করতে ট্যাপ করুন"
-            >
-              {React.createElement(activeModeObj.icon, { className: 'w-3.5 h-3.5 text-emerald-700 shrink-0' })}
-              <span className="truncate max-w-[75px] sm:max-w-[100px]">{activeModeObj.shortLabel}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-emerald-700 transition-transform ${isMobileMenuOpen ? 'rotate-180' : ''}`} />
-            </button>
-
             {/* Bookmarks Filter */}
             <button
               id="btn-filter-bookmarks"
               onClick={() => setOnlyBookmarked(!onlyBookmarked)}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl border transition text-xs font-bengali ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl border transition text-xs font-bengali min-h-[36px] ${
                 onlyBookmarked
                   ? 'bg-amber-100/90 text-amber-900 border-amber-300 font-semibold'
                   : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
@@ -340,7 +318,7 @@ export default function App() {
             <button
               id="btn-filter-mastered"
               onClick={() => setOnlyMastered(!onlyMastered)}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl border transition text-xs font-bengali ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl border transition text-xs font-bengali min-h-[36px] ${
                 onlyMastered
                   ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-semibold'
                   : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
@@ -351,69 +329,11 @@ export default function App() {
               <span className="hidden sm:inline">মুখস্থ</span>
               <span className="text-[11px] px-1 rounded-md bg-emerald-200/60 font-bold">{masteredIds.length}</span>
             </button>
-
-            {/* Mobile Hamburger Toggle */}
-            <button
-              id="btn-mobile-nav-toggle"
-              onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-              className="md:hidden p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition border border-stone-200 flex items-center justify-center min-w-[36px] min-h-[36px]"
-              aria-label="মোবাইল নেভিগেশন মেনু"
-            >
-              {isMobileMenuOpen ? <X className="w-4 h-4 text-stone-900" /> : <Menu className="w-4 h-4 text-stone-900" />}
-            </button>
           </div>
         </div>
 
-        {/* Mobile Dropdown Menu (Animated slide-down when open) */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-stone-200 bg-white/98 backdrop-blur-md px-3.5 py-3 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-200">
-            <div className="text-[11px] font-bold text-stone-400 font-bengali uppercase tracking-wider px-1">
-              অনুশীলন ও অধ্যায়ন মোড
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {studyModesList.map((item) => {
-                const Icon = item.icon;
-                const active = isModeActive(item.id, item.direction);
-                return (
-                  <button
-                    key={item.key}
-                    id={`mobile-tab-mode-${item.key}`}
-                    onClick={() => handleSelectMode(item.id, item.direction)}
-                    className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-bengali font-semibold transition border min-h-[44px] ${
-                      active
-                        ? item.isLive
-                          ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
-                          : 'bg-emerald-800 text-white border-emerald-900 shadow-xs'
-                        : item.isLive
-                        ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'
-                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`p-1.5 rounded-lg ${active ? 'bg-white/20 text-white' : 'bg-white border border-stone-200 text-stone-700'}`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <span>{item.label}</span>
-                    </div>
-                    {item.isLive ? (
-                      <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                        LIVE
-                      </span>
-                    ) : item.badge ? (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${active ? 'bg-white/25 text-white' : 'bg-stone-200 text-stone-700'}`}>
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Primary Mode Tabs (Visible on all screens: horizontal swipe on mobile, clean flex on desktop) */}
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none py-2 border-t border-stone-100 touch-pan-x">
+        {/* Desktop Mode Navigation Bar (Visible on desktop screens >= md) */}
+        <div className="hidden md:flex max-w-7xl mx-auto px-6 items-center gap-2 overflow-x-auto scrollbar-none py-2 border-t border-stone-100">
           {studyModesList.map((item) => {
             const Icon = item.icon;
             const active = isModeActive(item.id, item.direction);
@@ -452,12 +372,12 @@ export default function App() {
         <>
           <nav className="bg-stone-100/90 border-b border-stone-200/90 px-3 sm:px-6 py-2.5">
             <div className="max-w-7xl mx-auto space-y-2">
-              {/* Mobile Chapter Selector (Compact native selector for mobile screens < md) */}
-              <div className="md:hidden flex flex-col sm:flex-row gap-2">
-                <div className="flex-1">
-                  <label className="text-[11px] font-semibold text-stone-600 font-bengali mb-1 flex items-center gap-1">
-                    <BookOpen className="w-3.5 h-3.5 text-emerald-700" />
-                    মূল অধ্যায়:
+              {/* Mobile Chapter Selector (Compact side-by-side selectors on mobile screens < md) */}
+              <div className="md:hidden grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-semibold text-stone-600 font-bengali mb-1 flex items-center gap-1 truncate">
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    <span className="truncate">মূল অধ্যায়:</span>
                   </label>
                   <select
                     id="select-unit-mobile"
@@ -467,7 +387,7 @@ export default function App() {
                       setSelectedUnitNumber(val);
                       setSelectedChapterId('all');
                     }}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 bg-white font-bengali text-stone-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-stone-300 bg-white font-bengali text-stone-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-600 truncate min-h-[36px]"
                   >
                     <option value="all">বই সমগ্র ({vocabularyItems.length} শব্দ)</option>
                     {bookUnits.map((u) => {
@@ -477,17 +397,17 @@ export default function App() {
                       }).length;
                       return (
                         <option key={u.id} value={u.number}>
-                          {u.titleBn} ({u.titleAr}) - [{unitCount} শব্দ]
+                          {u.titleBn} [{unitCount}]
                         </option>
                       );
                     })}
                   </select>
                 </div>
 
-                <div className="flex-1">
-                  <label className="text-[11px] font-semibold text-stone-600 font-bengali mb-1 flex items-center gap-1">
-                    <Layers className="w-3.5 h-3.5 text-emerald-700" />
-                    নির্দিষ্ট পাঠ:
+                <div>
+                  <label className="text-[11px] font-semibold text-stone-600 font-bengali mb-1 flex items-center gap-1 truncate">
+                    <Layers className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    <span className="truncate">নির্দিষ্ট পাঠ:</span>
                   </label>
                   <select
                     id="select-lesson-mobile"
@@ -502,16 +422,16 @@ export default function App() {
                         }
                       }
                     }}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 bg-white font-bengali text-stone-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-stone-300 bg-white font-bengali text-stone-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-600 truncate min-h-[36px]"
                   >
                     <option value="all">
-                      {selectedUnitNumber === 'all' ? 'সকল পাঠ' : 'এই অধ্যায়ের সকল পাঠ'}
+                      {selectedUnitNumber === 'all' ? 'সকল পাঠ' : 'সকল পাঠ'}
                     </option>
                     {availableLessons.map((ch) => {
                       const count = vocabularyItems.filter((i) => i.chapterId === ch.id).length;
                       return (
                         <option key={ch.id} value={ch.id}>
-                          {ch.titleBn} ({count}টি শব্দ)
+                          {ch.titleBn} ({count})
                         </option>
                       );
                     })}
@@ -655,7 +575,7 @@ export default function App() {
       )}
 
       {/* MAIN CONTENT AREA */}
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 flex-1 pb-16">
+      <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 flex-1 pb-24 md:pb-16">
         {/* 1. FLASHCARD MODE */}
         {studyMode === 'flashcards' && (
           <div className="flex flex-col items-center">
@@ -671,14 +591,47 @@ export default function App() {
               </div>
             ) : currentItem ? (
               <div className="w-full max-w-xl sm:max-w-2xl flex flex-col items-center gap-3 sm:gap-4">
-                {/* Mode Indicator & Shortcuts Info */}
-                <div className="w-full flex items-center justify-between text-xs text-stone-500 font-bengali px-2">
-                  <span className="font-semibold text-emerald-800">
-                    {cardDirection === 'photo' && 'চিত্রযুক্ত মোড'}
-                    {cardDirection === 'bn_to_ar' && 'বাংলা ➔ আরবী মোড'}
-                    {cardDirection === 'ar_to_bn' && 'আরবী ➔ বাংলা মোড'}
-                  </span>
-                  <span>
+                {/* Direction Switcher & Card Counter */}
+                <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2 px-1">
+                  {/* Segmented Direction Controller */}
+                  <div className="w-full sm:w-auto flex items-center p-1 bg-stone-200/70 rounded-2xl shadow-inner text-xs font-semibold font-bengali">
+                    <button
+                      id="btn-direction-photo"
+                      onClick={() => setCardDirection('photo')}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl transition min-h-[34px] ${
+                        cardDirection === 'photo'
+                          ? 'bg-white text-emerald-900 shadow-2xs font-bold'
+                          : 'text-stone-600 hover:text-stone-900'
+                      }`}
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>ছবিযুক্ত</span>
+                    </button>
+                    <button
+                      id="btn-direction-bn-ar"
+                      onClick={() => setCardDirection('bn_to_ar')}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl transition min-h-[34px] ${
+                        cardDirection === 'bn_to_ar'
+                          ? 'bg-white text-emerald-900 shadow-2xs font-bold'
+                          : 'text-stone-600 hover:text-stone-900'
+                      }`}
+                    >
+                      <span>বাংলা ➔ আরবী</span>
+                    </button>
+                    <button
+                      id="btn-direction-ar-bn"
+                      onClick={() => setCardDirection('ar_to_bn')}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl transition min-h-[34px] ${
+                        cardDirection === 'ar_to_bn'
+                          ? 'bg-white text-emerald-900 shadow-2xs font-bold'
+                          : 'text-stone-600 hover:text-stone-900'
+                      }`}
+                    >
+                      <span>আরবী ➔ বাংলা</span>
+                    </button>
+                  </div>
+
+                  <span className="text-xs font-semibold text-stone-600 font-bengali">
                     কার্ড {currentIndex + 1} / {filteredItems.length}
                   </span>
                 </div>
@@ -1002,11 +955,93 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="mt-auto bg-white border-t border-stone-200 py-4 text-center text-xs text-stone-500 font-bengali">
+      <footer className="mt-auto bg-white border-t border-stone-200 py-4 text-center text-xs text-stone-500 font-bengali pb-20 md:pb-4">
         <p>
           "এসো আরবী শিখি" (الطريق إلى العربية) — হযরত মাওলানা আবু তাহের মেসবাহ দামাত বারাকাতুহুম
         </p>
       </footer>
+
+      {/* Mobile Bottom Navigation Bar (Fixed thumb-friendly navigation bar on mobile < md) */}
+      <nav
+        id="mobile-bottom-nav"
+        aria-label="মোবাইল নেভিগেশন"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1 safe-area-bottom"
+      >
+        <div className="flex items-center justify-around gap-1 max-w-lg mx-auto">
+          {/* 1. Flashcards */}
+          <button
+            id="mobile-nav-flashcards"
+            onClick={() => setStudyMode('flashcards')}
+            className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition min-h-[48px] active:scale-95 ${
+              studyMode === 'flashcards'
+                ? 'text-emerald-900 font-bold bg-emerald-50'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <BookOpen className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[11px] font-bengali leading-tight">কার্ড</span>
+          </button>
+
+          {/* 2. Photo Gallery */}
+          <button
+            id="mobile-nav-gallery"
+            onClick={() => setStudyMode('photo_gallery')}
+            className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition min-h-[48px] active:scale-95 ${
+              studyMode === 'photo_gallery'
+                ? 'text-emerald-900 font-bold bg-emerald-50'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <Sparkles className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[11px] font-bengali leading-tight">গ্যালারি</span>
+          </button>
+
+          {/* 3. Quiz */}
+          <button
+            id="mobile-nav-quiz"
+            onClick={() => setStudyMode('quiz')}
+            className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition min-h-[48px] active:scale-95 ${
+              studyMode === 'quiz'
+                ? 'text-emerald-900 font-bold bg-emerald-50'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <HelpCircle className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[11px] font-bengali leading-tight">কুইজ</span>
+          </button>
+
+          {/* 4. Glossary / Vocabulary */}
+          <button
+            id="mobile-nav-glossary"
+            onClick={() => setStudyMode('glossary')}
+            className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition min-h-[48px] active:scale-95 ${
+              studyMode === 'glossary'
+                ? 'text-emerald-900 font-bold bg-emerald-50'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <List className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[11px] font-bengali leading-tight">শব্দকোষ</span>
+          </button>
+
+          {/* 5. Collaborative Live Room */}
+          <button
+            id="mobile-nav-room"
+            onClick={() => setStudyMode('room')}
+            className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition min-h-[48px] active:scale-95 relative ${
+              studyMode === 'room'
+                ? 'text-amber-950 font-bold bg-amber-100 border border-amber-300'
+                : 'text-amber-800 bg-amber-50/80 border border-amber-200/60 hover:bg-amber-100/60'
+            }`}
+          >
+            <div className="relative">
+              <Users className="w-5 h-5 mb-0.5 shrink-0" />
+              <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
+            </div>
+            <span className="text-[11px] font-bengali leading-tight font-semibold">লাইভ রুম</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }
