@@ -152,14 +152,23 @@ export function useRoomSocket() {
         prev.activeCard &&
         resolvedCard &&
         prev.activeCard.cardId === resolvedCard.cardId &&
-        prev.activeCard.putAt === resolvedCard.putAt &&
-        prev.activeCard.isFlipped &&
-        !resolvedCard.isFlipped
+        prev.activeCard.putAt === resolvedCard.putAt
       ) {
+        if (prev.activeCard.isFlipped && !resolvedCard.isFlipped) {
+          resolvedCard = {
+            ...resolvedCard,
+            isFlipped: true,
+            flippedAt: prev.activeCard.flippedAt || Date.now(),
+          };
+        }
+
+        // Merge revealed sentences in a passage card so user clicks are not lost
+        const prevIndices = prev.activeCard.revealedSentenceIndices || [];
+        const incomingIndices = resolvedCard.revealedSentenceIndices || [];
+        const mergedIndices = Array.from(new Set([...prevIndices, ...incomingIndices])).sort((a, b) => a - b);
         resolvedCard = {
           ...resolvedCard,
-          isFlipped: true,
-          flippedAt: prev.activeCard.flippedAt || Date.now(),
+          revealedSentenceIndices: mergedIndices,
         };
       }
 
@@ -583,6 +592,7 @@ export function useRoomSocket() {
           putAt: Date.now(),
           isFlipped: false,
           mode,
+          revealedSentenceIndices: [],
         },
         version: nextVersion,
         lastUpdatedAt: Date.now(),
@@ -653,6 +663,7 @@ export function useRoomSocket() {
           putAt: Date.now(),
           isFlipped: false,
           mode: cardMode,
+          revealedSentenceIndices: [],
         },
         version: nextVersion,
         lastUpdatedAt: Date.now(),
@@ -753,6 +764,60 @@ export function useRoomSocket() {
       } catch {}
     }
   }, [roomState, clientId, showError, broadcastLocal]);
+
+  const revealPassageSentence = useCallback(
+    (sentenceIndex: number) => {
+      if (!roomState || !roomState.activeCard) return;
+
+      // RULE: Only the person who placed the card can reveal the sentence meaning!
+      if (roomState.activeCard.putByUserId !== clientId) {
+        showError(`শুধুমাত্র ${roomState.activeCard.putByUsername} যিনি কার্ডটি রেখেছেন তিনিই বাক্যের অর্থ উন্মোচন করতে পারবেন!`);
+        return;
+      }
+
+      const currentRevealed = roomState.activeCard.revealedSentenceIndices || [];
+      const isAlreadyRevealed = currentRevealed.includes(sentenceIndex);
+      const nextRevealed = isAlreadyRevealed
+        ? currentRevealed.filter((i) => i !== sentenceIndex)
+        : [...currentRevealed, sentenceIndex].sort((a, b) => a - b);
+
+      const nextVersion = (roomState.version || 0) + 1;
+      const updatedState: RoomState = {
+        ...roomState,
+        activeCard: {
+          ...roomState.activeCard,
+          revealedSentenceIndices: nextRevealed,
+        },
+        version: nextVersion,
+        lastUpdatedAt: Date.now(),
+        lastSenderId: clientId,
+      };
+
+      // 1. Instant optimistic local update
+      setRoomState(updatedState);
+      try {
+        localStorage.setItem(`esho_room_${roomState.code}`, JSON.stringify(updatedState));
+      } catch {}
+      broadcastLocal({ type: 'SYNC_STATE', code: roomState.code, state: updatedState });
+
+      // 2. High-speed MQTT dispatch to all peers (<150ms)
+      mqttRelayRef.current?.publishState(updatedState);
+
+      // 3. Keep WebSocket server synced if connected
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(
+            JSON.stringify({
+              type: 'REVEAL_PASSAGE_SENTENCE',
+              index: sentenceIndex,
+              version: nextVersion,
+            })
+          );
+        } catch {}
+      }
+    },
+    [roomState, clientId, showError, broadcastLocal]
+  );
 
   const clearCard = useCallback(() => {
     if (!roomState || !roomState.activeCard) return;
@@ -946,6 +1011,7 @@ export function useRoomSocket() {
     refreshCard,
     syncRoom,
     flipCard,
+    revealPassageSentence,
     clearCard,
     sendMessage,
     leaveRoom,

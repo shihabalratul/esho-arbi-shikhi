@@ -23,6 +23,10 @@
   transform: rotateY(180deg);
 }
 
+.overscroll-contain {
+  overscroll-behavior: contain;
+}
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-6px); }

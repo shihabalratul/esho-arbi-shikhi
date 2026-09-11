@@ -1,6 +1,27 @@
-export type StudyMode = 'flashcards' | 'photo_gallery' | 'quiz' | 'glossary' | 'room';
+export type StudyMode = 'flashcards' | 'photo_gallery' | 'quiz' | 'glossary' | 'sentences' | 'room';
 
 export type CardDirection = 'photo' | 'bn_to_ar' | 'ar_to_bn';
+
+export interface SentenceWordUsage {
+  wordAr: string;
+  wordBn: string;
+  meaning?: string;
+}
+
+export interface SentenceItem {
+  id: string;
+  arabic: string; // full Tashkeel
+  arabicClean: string; // without Tashkeel for search
+  bangla: string; // Bengali translation
+  banglaTranslit?: string; // Bengali transliteration/pronunciation
+  english?: string;
+  source: 'book' | 'derived'; // 'book' = কিতাবের মূল বাক্য, 'derived' = কিতাবের শব্দ দিয়ে নতুন বাক্য
+  category: string; // e.g. মৌলিক ইশারা, সিফাত-মাওসূফ, যমীর ও পরিচয়, ইজাফত, ইত্যাদি
+  chapterId?: string;
+  lessonName?: string;
+  grammarNote?: string; // ব্যাকরণগত গঠন বা বিশ্লেষণ
+  bookWordsUsed?: SentenceWordUsage[]; // শব্দকোষ থেকে ব্যবহৃত শব্দসমূহ
+}
 
 export interface RoomParticipant {
   id: string;
@@ -8,6 +29,14 @@ export interface RoomParticipant {
   avatarColor: string;
   isHost: boolean;
   joinedAt: number;
+}
+
+export type ItemType = 'word' | 'sentence' | 'passage';
+
+export interface PassageSentence {
+  arabic: string;
+  bangla: string;
+  translit?: string;
 }
 
 export interface PlacedCard {
@@ -18,6 +47,7 @@ export interface PlacedCard {
   isFlipped: boolean;
   flippedAt?: number;
   mode: CardDirection;
+  revealedSentenceIndices?: number[];
 }
 
 export interface RoomMessage {
@@ -76,7 +106,10 @@ export interface VocabularyItem {
   english: string;
   chapterId: string;
   lesson?: string; // e.g. "প্রথম পাঠ", "দ্বিতীয় পাঠ"
-  category: 'object' | 'person' | 'adjective' | 'verb' | 'nature' | 'food' | 'animal' | 'anatomy' | 'islamic' | 'phrase';
+  category: 'object' | 'person' | 'adjective' | 'verb' | 'nature' | 'food' | 'animal' | 'anatomy' | 'islamic' | 'phrase' | 'sentence' | 'passage';
+  itemType?: ItemType; // 'word' | 'sentence' | 'passage' (defaults to 'word')
+  passageTitle?: string;
+  passageSentences?: PassageSentence[]; // For passages: individual sentences with meanings
   gender?: 'masculine' | 'feminine';
   hasIllustration: boolean;
   illustrationKey?: string;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, Bookmark, BookmarkCheck, RotateCw, CheckCircle2, RefreshCw, HelpCircle, BookOpen, Sparkles } from 'lucide-react';
 import { VocabularyItem, CardDirection } from '../types';
 import { ItemIllustration } from './illustrations';
@@ -22,11 +22,21 @@ export const Flashcard: React.FC<FlashcardProps> = ({
   onToggleMastered,
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
+  const backScrollRef = useRef<HTMLDivElement>(null);
 
-  // Reset flip state when card changes
+  // Reset flip state and scroll when card changes or flips
   useEffect(() => {
     setIsFlipped(false);
+    if (backScrollRef.current) {
+      backScrollRef.current.scrollTop = 0;
+    }
   }, [item.id, direction]);
+
+  useEffect(() => {
+    if (backScrollRef.current) {
+      backScrollRef.current.scrollTop = 0;
+    }
+  }, [isFlipped]);
 
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
@@ -42,7 +52,11 @@ export const Flashcard: React.FC<FlashcardProps> = ({
         }`}
       >
         {/* FRONT OF THE CARD */}
-        <div className="absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col justify-between backface-hidden bg-gradient-to-b from-white to-stone-50/80">
+        <div
+          className={`absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col justify-between backface-hidden bg-gradient-to-b from-white to-stone-50/80 transition-all ${
+            isFlipped ? 'pointer-events-none z-0' : 'pointer-events-auto z-10'
+          }`}
+        >
           {/* Top Bar */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -150,7 +164,11 @@ export const Flashcard: React.FC<FlashcardProps> = ({
         </div>
 
         {/* BACK OF THE CARD */}
-        <div className="absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 flex flex-col justify-between rotate-y-180 backface-hidden bg-gradient-to-b from-stone-900 to-stone-950 text-stone-100 border border-stone-800 shadow-2xl">
+        <div
+          className={`absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 flex flex-col justify-between rotate-y-180 backface-hidden bg-gradient-to-b from-stone-900 to-stone-950 text-stone-100 border border-stone-800 shadow-2xl transition-all ${
+            isFlipped ? 'pointer-events-auto z-10' : 'pointer-events-none z-0'
+          }`}
+        >
           {/* Top Bar */}
           <div className="flex items-center justify-between pb-2 border-b border-stone-800/80 shrink-0">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -180,7 +198,12 @@ export const Flashcard: React.FC<FlashcardProps> = ({
           </div>
 
           {/* Main Content - Scrollable for complete reading */}
-          <div className="flex-1 overflow-y-auto px-1 sm:px-2 py-2 space-y-3 scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent">
+          <div
+            ref={backScrollRef}
+            className={`flex-1 px-1 sm:px-2 py-2 space-y-3 scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent overscroll-contain ${
+              isFlipped ? 'overflow-y-auto pointer-events-auto' : 'overflow-hidden pointer-events-none'
+            }`}
+          >
             {/* Top Identity Header */}
             <div className="flex items-center justify-center gap-2.5 sm:gap-3 pt-1">
               {item.hasIllustration && (
@@ -269,6 +292,49 @@ export const Flashcard: React.FC<FlashcardProps> = ({
                     অর্থ: {item.exampleSentenceBn}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* PASSAGE SENTENCES BREAKDOWN */}
+            {item.passageSentences && item.passageSentences.length > 0 && (
+              <div className="w-full bg-stone-900/95 rounded-2xl p-3 sm:p-4 border border-amber-500/30 text-left shadow-md">
+                <div className="text-xs sm:text-sm font-bold text-amber-400 font-bengali mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1 sm:gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+                    অনুচ্ছেদের বাক্যসমূহ ও পূর্ণাঙ্গ অনুবাদ
+                  </span>
+                  <span className="text-[10px] sm:text-[11px] text-stone-400 font-normal">
+                    {item.passageSentences.length}টি বাক্য
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {item.passageSentences.map((sent, sIdx) => (
+                    <div
+                      key={sIdx}
+                      className="bg-stone-800/80 hover:bg-stone-800 rounded-xl p-2.5 sm:p-3 border border-stone-700/60 flex items-center justify-between gap-2.5 sm:gap-3 transition"
+                    >
+                      <div className="flex-1 text-right">
+                        <div className="text-lg xs:text-xl sm:text-2xl font-bold text-amber-200 font-arabic dir-rtl leading-snug">
+                          {sent.arabic}
+                        </div>
+                        <div className="text-xs sm:text-sm text-emerald-200 font-bengali text-left mt-1">
+                          {sent.bangla}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          speakArabic(sent.arabic);
+                        }}
+                        className="p-1.5 sm:p-2 rounded-full bg-emerald-800/70 hover:bg-emerald-600 text-white transition shrink-0 min-w-[34px] min-h-[34px] flex items-center justify-center"
+                        title="এই বাক্যটি শুনুন"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

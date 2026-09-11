@@ -1151,6 +1151,358 @@ export const ItemIllustration: React.FC<IllustrationProps> = ({ name, className 
           <line x1="28" y1="20" x2="28" y2="80" stroke="#94A3B8" strokeWidth="2" />
         </svg>
       );
+
+    // --- DEDICATED DISTINCT ILLUSTRATIONS ---
+    case 'mattress': // فِرَاشٌ (বিছানা / তোশক)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Base padded floor mattress with rounded corners */}
+          <rect x="14" y="44" width="72" height="28" rx="7" fill="#6366F1" stroke="#4338CA" strokeWidth="2.5" />
+          {/* Quilt stitching pattern */}
+          <line x1="28" y1="44" x2="28" y2="72" stroke="#818CF8" strokeWidth="1.5" strokeDasharray="3 2" />
+          <line x1="44" y1="44" x2="44" y2="72" stroke="#818CF8" strokeWidth="1.5" strokeDasharray="3 2" />
+          <line x1="60" y1="44" x2="60" y2="72" stroke="#818CF8" strokeWidth="1.5" strokeDasharray="3 2" />
+          <line x1="14" y1="58" x2="86" y2="58" stroke="#818CF8" strokeWidth="1.5" strokeDasharray="3 2" />
+          {/* Folded blanket / duvet on top */}
+          <path d="M40 44 L86 44 L86 64 L40 64 Z" fill="#F43F5E" stroke="#BE123C" strokeWidth="2" />
+          <line x1="40" y1="48" x2="86" y2="48" stroke="#FDA4AF" strokeWidth="2" />
+          {/* Small bolster / rolled pillow at the head */}
+          <rect x="18" y="34" width="22" height="13" rx="5" fill="#FEF08A" stroke="#CA8A04" strokeWidth="2" />
+          <line x1="24" y1="34" x2="24" y2="47" stroke="#EAB308" strokeWidth="1.5" />
+        </svg>
+      );
+
+    case 'pillow': // وِسَادَةٌ (বালিশ)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Plush rectangular pillow with pinched corners */}
+          <path d="M18 36 C24 28 76 28 82 36 C88 44 88 56 82 64 C76 72 24 72 18 64 C12 56 12 44 18 36 Z" fill="#E0F2FE" stroke="#0284C7" strokeWidth="2.5" />
+          {/* Center soft indentation crease */}
+          <ellipse cx="50" cy="50" rx="18" ry="8" fill="#BAE6FD" stroke="#38BDF8" strokeWidth="1.5" />
+          {/* Corner decorative stitching */}
+          <circle cx="17" cy="35" r="2.5" fill="#38BDF8" />
+          <circle cx="83" cy="35" r="2.5" fill="#38BDF8" />
+          <circle cx="17" cy="65" r="2.5" fill="#38BDF8" />
+          <circle cx="83" cy="65" r="2.5" fill="#38BDF8" />
+          <path d="M42 48 Q50 53 58 48" stroke="#0369A1" strokeWidth="2" fill="none" />
+        </svg>
+      );
+
+    case 'ship': // سَفِينَةٌ (জাহাজ)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Ocean Waves */}
+          <path d="M10 82 Q25 78 40 82 Q55 86 70 82 Q85 78 95 82" stroke="#0284C7" strokeWidth="3" />
+          {/* Big Ship Hull */}
+          <path d="M16 54 L84 54 L76 74 L24 74 Z" fill="#1E293B" stroke="#0F172A" strokeWidth="2.5" />
+          <path d="M20 54 L80 54 L80 62 L20 62 Z" fill="#DC2626" />
+          {/* Superstructure / Decks */}
+          <rect x="28" y="36" width="44" height="18" rx="2" fill="#F8FAFC" stroke="#64748B" strokeWidth="2" />
+          <rect x="36" y="24" width="28" height="12" rx="2" fill="#FFFFFF" stroke="#64748B" strokeWidth="2" />
+          {/* Bridge Windows */}
+          <rect x="40" y="27" width="4" height="4" fill="#38BDF8" />
+          <rect x="48" y="27" width="4" height="4" fill="#38BDF8" />
+          <rect x="56" y="27" width="4" height="4" fill="#38BDF8" />
+          {/* Radar mast */}
+          <line x1="50" y1="24" x2="50" y2="14" stroke="#475569" strokeWidth="2" />
+          <line x1="44" y1="17" x2="56" y2="17" stroke="#475569" strokeWidth="2" />
+          {/* Portholes on main deck */}
+          <circle cx="36" cy="45" r="2.5" fill="#38BDF8" stroke="#0284C7" strokeWidth="1" />
+          <circle cx="50" cy="45" r="2.5" fill="#38BDF8" stroke="#0284C7" strokeWidth="1" />
+          <circle cx="64" cy="45" r="2.5" fill="#38BDF8" stroke="#0284C7" strokeWidth="1" />
+          {/* Anchor on bow */}
+          <circle cx="25" cy="66" r="1.5" fill="#FBBF24" />
+        </svg>
+      );
+
+    case 'steamer': // بَاخِرَةٌ (স্টীমার / বাষ্পীয় জাহাজ)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Water waves */}
+          <path d="M10 84 Q30 80 50 84 Q70 88 90 84" stroke="#0284C7" strokeWidth="2.5" />
+          {/* Hull */}
+          <path d="M18 60 L82 60 L74 76 L26 76 Z" fill="#B45309" stroke="#78350F" strokeWidth="2.5" />
+          <rect x="22" y="58" width="56" height="4" fill="#FDE68A" />
+          {/* Main Cabin */}
+          <rect x="26" y="44" width="48" height="14" rx="2" fill="#F8FAFC" stroke="#64748B" strokeWidth="2" />
+          <circle cx="34" cy="51" r="2.5" fill="#38BDF8" />
+          <circle cx="44" cy="51" r="2.5" fill="#38BDF8" />
+          <circle cx="54" cy="51" r="2.5" fill="#38BDF8" />
+          <circle cx="64" cy="51" r="2.5" fill="#38BDF8" />
+          {/* Twin Steam Funnels */}
+          <rect x="36" y="28" width="8" height="16" fill="#EF4444" stroke="#B91C1C" strokeWidth="1.5" />
+          <rect x="36" y="25" width="8" height="4" fill="#1E293B" />
+          <rect x="52" y="28" width="8" height="16" fill="#EF4444" stroke="#B91C1C" strokeWidth="1.5" />
+          <rect x="52" y="25" width="8" height="4" fill="#1E293B" />
+          {/* Billowing Steam Clouds */}
+          <circle cx="40" cy="18" r="4" fill="#E2E8F0" opacity="0.85" />
+          <circle cx="45" cy="12" r="5" fill="#E2E8F0" opacity="0.85" />
+          <circle cx="56" cy="17" r="4" fill="#E2E8F0" opacity="0.85" />
+          <circle cx="63" cy="11" r="6" fill="#E2E8F0" opacity="0.8" />
+        </svg>
+      );
+
+    case 'goat': // شَاةٌ (বকরি / ছাগল)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Sleek body */}
+          <ellipse cx="48" cy="56" rx="22" ry="16" fill="#FEF3C7" stroke="#D97706" strokeWidth="2.5" />
+          {/* Slender legs */}
+          <line x1="34" y1="68" x2="32" y2="86" stroke="#B45309" strokeWidth="3" />
+          <line x1="42" y1="68" x2="40" y2="86" stroke="#B45309" strokeWidth="3" />
+          <line x1="56" y1="68" x2="56" y2="86" stroke="#B45309" strokeWidth="3" />
+          <line x1="64" y1="68" x2="66" y2="86" stroke="#B45309" strokeWidth="3" />
+          {/* Hooves */}
+          <line x1="30" y1="86" x2="34" y2="86" stroke="#1E293B" strokeWidth="3" />
+          <line x1="38" y1="86" x2="42" y2="86" stroke="#1E293B" strokeWidth="3" />
+          <line x1="54" y1="86" x2="58" y2="86" stroke="#1E293B" strokeWidth="3" />
+          <line x1="64" y1="86" x2="68" y2="86" stroke="#1E293B" strokeWidth="3" />
+          {/* Short perky tail */}
+          <path d="M26 52 Q20 46 22 42" stroke="#D97706" strokeWidth="3" fill="none" />
+          {/* Long neck and head */}
+          <path d="M62 58 L72 38 L80 44 L68 64 Z" fill="#FEF3C7" stroke="#D97706" strokeWidth="2.5" />
+          {/* Backward curved horns */}
+          <path d="M72 35 Q68 20 58 18" stroke="#78350F" strokeWidth="3.5" fill="none" />
+          {/* Alert Ear */}
+          <ellipse cx="66" cy="38" rx="6" ry="3" transform="rotate(-30 66 38)" fill="#FDE68A" stroke="#D97706" />
+          {/* Eye */}
+          <circle cx="75" cy="40" r="2" fill="#1E293B" />
+          {/* Chin goatee */}
+          <path d="M80 45 L84 54 L78 50 Z" fill="#B45309" />
+        </svg>
+      );
+
+    case 'flower': // زَهْرَةٌ (ফুল)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {/* Stem & Leaves */}
+          <path d="M50 52 Q48 72 52 90" stroke="#16A34A" strokeWidth="3.5" />
+          <path d="M50 70 Q34 60 38 78 Z" fill="#4ADE80" stroke="#15803D" />
+          <path d="M50 64 Q66 54 62 72 Z" fill="#4ADE80" stroke="#15803D" />
+          {/* 8 Radial blooming petals */}
+          <circle cx="50" cy="24" r="10" fill="#FB7185" stroke="#E11D48" />
+          <circle cx="68" cy="32" r="10" fill="#FB7185" stroke="#E11D48" />
+          <circle cx="68" cy="50" r="10" fill="#FB7185" stroke="#E11D48" />
+          <circle cx="50" cy="58" r="10" fill="#FB7185" stroke="#E11D48" />
+          <circle cx="32" cy="50" r="10" fill="#FB7185" stroke="#E11D48" />
+          <circle cx="32" cy="32" r="10" fill="#FB7185" stroke="#E11D48" />
+          {/* Central golden disc floret */}
+          <circle cx="50" cy="41" r="12" fill="#FBBF24" stroke="#D97706" strokeWidth="2.5" />
+          <circle cx="50" cy="41" r="5" fill="#F59E0B" />
+        </svg>
+      );
+
+    case 'sparrow': // عُصْفُورٌ (চড়ুই পাখি)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Perched branch */}
+          <line x1="15" y1="78" x2="85" y2="78" stroke="#78350F" strokeWidth="4" />
+          <path d="M30 78 Q26 70 32 70" stroke="#15803D" strokeWidth="2" fill="#4ADE80" />
+          {/* Feet */}
+          <line x1="44" y1="72" x2="44" y2="78" stroke="#D97706" strokeWidth="2" />
+          <line x1="56" y1="72" x2="56" y2="78" stroke="#D97706" strokeWidth="2" />
+          {/* Chubby body */}
+          <ellipse cx="48" cy="54" rx="20" ry="18" fill="#FEF3C7" stroke="#92400E" strokeWidth="2.5" />
+          {/* Brown Wing with streaks */}
+          <path d="M32 50 Q48 44 56 60 Q40 70 32 50 Z" fill="#92400E" stroke="#78350F" strokeWidth="2" />
+          <line x1="38" y1="54" x2="50" y2="58" stroke="#FEF3C7" strokeWidth="1.5" />
+          {/* Round Head */}
+          <circle cx="64" cy="42" r="13" fill="#B45309" stroke="#78350F" strokeWidth="2" />
+          {/* White cheek patch */}
+          <ellipse cx="62" cy="45" rx="5" ry="4" fill="#FFFFFF" />
+          {/* Eye */}
+          <circle cx="66" cy="40" r="2" fill="#0F172A" />
+          {/* Cute short conical beak */}
+          <polygon points="76,40 86,43 76,46" fill="#F59E0B" stroke="#D97706" strokeWidth="1.5" />
+          {/* Pointed tail */}
+          <polygon points="28,58 14,64 22,50" fill="#78350F" stroke="#451A03" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'garment': // ثَوْبٌ (পোশাক / জুব্বা)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Full-length Arabian thobe/robe */}
+          <path d="M36 20 L50 24 L64 20 L84 32 L78 44 L70 38 L68 88 L32 88 L30 38 L22 44 L16 32 Z" fill="#F8FAFC" stroke="#0284C7" strokeWidth="2.5" />
+          {/* Mandarin band collar */}
+          <path d="M42 20 Q50 24 58 20" stroke="#0369A1" strokeWidth="2.5" fill="none" />
+          {/* Vertical button placket at chest */}
+          <line x1="50" y1="24" x2="50" y2="54" stroke="#0284C7" strokeWidth="2" />
+          <circle cx="50" cy="30" r="1.5" fill="#0369A1" />
+          <circle cx="50" cy="38" r="1.5" fill="#0369A1" />
+          <circle cx="50" cy="46" r="1.5" fill="#0369A1" />
+          {/* Subtle center drape fold */}
+          <line x1="50" y1="58" x2="50" y2="88" stroke="#E2E8F0" strokeWidth="2" strokeDasharray="4 4" />
+          {/* Chest pocket detail */}
+          <rect x="36" y="34" width="7" height="8" rx="1" fill="#FFFFFF" stroke="#38BDF8" strokeWidth="1.5" />
+        </svg>
+      );
+
+    case 'teacher_f': // مُعَلِّمَةٌ (শিক্ষিকা)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Hijab / Scarf */}
+          <path d="M26 40 C26 16 74 16 74 40 C74 68 70 82 50 82 C30 82 26 68 26 40 Z" fill="#8B5CF6" stroke="#6D28D9" />
+          {/* Kind face */}
+          <ellipse cx="50" cy="40" rx="14" ry="16" fill="#FED7AA" stroke="#EA580C" strokeWidth="2" />
+          {/* Glasses */}
+          <circle cx="43" cy="38" r="4.5" stroke="#7C3AED" strokeWidth="1.8" />
+          <circle cx="57" cy="38" r="4.5" stroke="#7C3AED" strokeWidth="1.8" />
+          <line x1="47.5" y1="38" x2="52.5" y2="38" stroke="#7C3AED" strokeWidth="1.8" />
+          <circle cx="43" cy="38" r="1.5" fill="#1E293B" />
+          <circle cx="57" cy="38" r="1.5" fill="#1E293B" />
+          <path d="M46 47 Q50 50 54 47" stroke="#EA580C" strokeWidth="2" />
+          {/* Dress / Coat */}
+          <path d="M28 82 L32 64 Q50 60 68 64 L72 82 Z" fill="#EDE9FE" stroke="#7C3AED" strokeWidth="2" />
+          {/* Open textbook held in front */}
+          <path d="M38 72 L50 75 L62 72 L62 86 L50 89 L38 86 Z" fill="#10B981" stroke="#047857" strokeWidth="1.5" />
+          <line x1="50" y1="75" x2="50" y2="89" stroke="#047857" strokeWidth="1.5" />
+        </svg>
+      );
+
+    case 'brother': // أَخٌ (ভাই)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Older brother (left) */}
+          <circle cx="36" cy="32" r="13" fill="#FED7AA" stroke="#EA580C" strokeWidth="2" />
+          <path d="M24 28 Q36 16 48 28" fill="#1E293B" stroke="#0F172A" strokeWidth="2" />
+          <circle cx="32" cy="32" r="1.5" fill="#1E293B" />
+          <circle cx="40" cy="32" r="1.5" fill="#1E293B" />
+          <path d="M33 38 Q36 41 39 38" stroke="#EA580C" strokeWidth="1.5" />
+          <path d="M22 76 L26 46 Q38 42 48 46 L50 76 Z" fill="#3B82F6" stroke="#1D4ED8" strokeWidth="2" />
+          {/* Younger brother (right) */}
+          <circle cx="64" cy="40" r="11" fill="#FED7AA" stroke="#EA580C" strokeWidth="2" />
+          <path d="M54 36 Q64 26 74 36" fill="#B45309" stroke="#78350F" strokeWidth="2" />
+          <circle cx="60" cy="40" r="1.5" fill="#1E293B" />
+          <circle cx="68" cy="40" r="1.5" fill="#1E293B" />
+          <path d="M61 45 Q64 48 67 45" stroke="#EA580C" strokeWidth="1.5" />
+          <path d="M52 76 L54 52 Q64 48 74 52 L78 76 Z" fill="#10B981" stroke="#047857" strokeWidth="2" />
+          {/* Arm over shoulder */}
+          <path d="M46 50 Q56 46 64 52" stroke="#1D4ED8" strokeWidth="3" />
+        </svg>
+      );
+
+    case 'sister': // أُخْتٌ (বোন)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Older sister (left) */}
+          <path d="M18 36 C18 18 52 18 52 36 C52 56 48 76 35 76 C22 76 18 56 18 36 Z" fill="#EC4899" stroke="#BE185D" strokeWidth="2" />
+          <ellipse cx="35" cy="36" rx="10" ry="12" fill="#FED7AA" stroke="#EA580C" strokeWidth="1.8" />
+          <circle cx="31" cy="35" r="1.5" fill="#1E293B" />
+          <circle cx="39" cy="35" r="1.5" fill="#1E293B" />
+          <path d="M32 42 Q35 44 38 42" stroke="#EA580C" strokeWidth="1.5" />
+          {/* Younger sister (right) */}
+          <path d="M48 44 C48 28 78 28 78 44 C78 62 74 76 63 76 C52 76 48 62 48 44 Z" fill="#8B5CF6" stroke="#6D28D9" strokeWidth="2" />
+          <ellipse cx="63" cy="44" rx="9" ry="10" fill="#FED7AA" stroke="#EA580C" strokeWidth="1.8" />
+          <circle cx="60" cy="43" r="1.5" fill="#1E293B" />
+          <circle cx="66" cy="43" r="1.5" fill="#1E293B" />
+          <path d="M61 48 Q63 50 65 48" stroke="#EA580C" strokeWidth="1.5" />
+          {/* Joined hands / small heart */}
+          <path d="M50 64 C48 60 44 60 44 64 C44 68 50 72 50 72 C50 72 56 68 56 64 C56 60 52 60 50 64 Z" fill="#F43F5E" />
+        </svg>
+      );
+
+    case 'face': // وَجْهٌ (মুখ / চেহারা)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Ears */}
+          <circle cx="21" cy="50" r="6" fill="#FED7AA" stroke="#EA580C" strokeWidth="2" />
+          <circle cx="79" cy="50" r="6" fill="#FED7AA" stroke="#EA580C" strokeWidth="2" />
+          {/* Main Face Contour */}
+          <ellipse cx="50" cy="50" rx="28" ry="34" fill="#FED7AA" stroke="#EA580C" strokeWidth="2.5" />
+          {/* Hair on top */}
+          <path d="M22 42 C26 22 74 22 78 42 C70 30 50 28 22 42 Z" fill="#334155" stroke="#1E293B" strokeWidth="2" />
+          {/* Eyebrows */}
+          <path d="M33 39 Q41 36 45 40" stroke="#1E293B" strokeWidth="2.5" fill="none" />
+          <path d="M55 40 Q59 36 67 39" stroke="#1E293B" strokeWidth="2.5" fill="none" />
+          {/* Expressive Eyes */}
+          <ellipse cx="39" cy="46" rx="4.5" ry="3.5" fill="#FFFFFF" stroke="#1E293B" strokeWidth="1.8" />
+          <circle cx="40" cy="46" r="2" fill="#0284C7" />
+          <ellipse cx="61" cy="46" rx="4.5" ry="3.5" fill="#FFFFFF" stroke="#1E293B" strokeWidth="1.8" />
+          <circle cx="60" cy="46" r="2" fill="#0284C7" />
+          {/* Nose */}
+          <path d="M50 48 L48 58 L53 58" stroke="#D97706" strokeWidth="2" fill="none" />
+          {/* Smile */}
+          <path d="M42 66 Q50 74 58 66" stroke="#DC2626" strokeWidth="2.5" fill="none" />
+        </svg>
+      );
+
+    case 'road': // طَرِيقٌ (একটি পথ / রাস্তা)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Rolling green countryside hills */}
+          <path d="M10 85 Q30 50 60 65 Q80 75 90 85 Z" fill="#86EFAC" stroke="#16A34A" strokeWidth="2" />
+          {/* Scenic winding natural pathway */}
+          <path d="M50 20 Q54 40 38 56 Q20 74 25 85 L65 85 Q55 70 60 52 Q64 36 56 20 Z" fill="#FDE68A" stroke="#B45309" strokeWidth="2.5" />
+          {/* Road milestone marker */}
+          <rect x="68" y="60" width="10" height="16" rx="5" fill="#FFFFFF" stroke="#64748B" strokeWidth="2" />
+          <line x1="71" y1="68" x2="75" y2="68" stroke="#DC2626" strokeWidth="2" />
+          {/* Distant trees */}
+          <circle cx="78" cy="42" r="10" fill="#22C55E" stroke="#15803D" strokeWidth="1.5" />
+          <line x1="78" y1="52" x2="78" y2="62" stroke="#78350F" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'glass': // كُوبٌ (একটি গ্লাস)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Transparent drinking tumbler */}
+          <path d="M28 20 L35 80 Q50 85 65 80 L72 20 Z" fill="#F0F9FF" stroke="#0284C7" strokeWidth="2.5" />
+          {/* Water level inside */}
+          <path d="M31 46 L35 79 Q50 84 65 79 L69 46 Z" fill="#38BDF8" opacity="0.8" />
+          <ellipse cx="50" cy="46" rx="19" ry="4" fill="#7DD3FC" stroke="#0284C7" strokeWidth="1.5" />
+          {/* Glass Rim Top */}
+          <ellipse cx="50" cy="20" rx="22" ry="5" fill="#E0F2FE" stroke="#0284C7" strokeWidth="2" />
+          {/* Specular glass reflection shine */}
+          <line x1="38" y1="28" x2="42" y2="72" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="42" y1="32" x2="44" y2="54" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+          {/* Water bubbles */}
+          <circle cx="48" cy="62" r="2" fill="#FFFFFF" opacity="0.7" />
+          <circle cx="56" cy="54" r="1.5" fill="#FFFFFF" opacity="0.7" />
+        </svg>
+      );
+
+    case 'quran': // القُرْآنُ الكَرِيمُ (পবিত্র কুরআন)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Traditional Carved Wooden Rehal (X-Stand) */}
+          <polygon points="26,74 74,44 78,50 30,80" fill="#78350F" stroke="#451A03" strokeWidth="1.5" />
+          <polygon points="74,74 26,44 22,50 70,80" fill="#92400E" stroke="#451A03" strokeWidth="1.5" />
+          <circle cx="50" cy="58" r="3" fill="#F59E0B" />
+          {/* Open Holy Quran Pages */}
+          <path d="M16 38 Q50 46 50 62 Q50 46 84 38 L84 22 Q50 30 50 46 Q50 30 16 22 Z" fill="#047857" stroke="#064E3B" strokeWidth="2.5" />
+          <path d="M20 36 Q50 43 50 58 Q50 43 80 36 L80 24 Q50 31 50 44 Q50 31 20 24 Z" fill="#FFFBEB" stroke="#047857" strokeWidth="1.5" />
+          {/* Gold Islamic Calligraphy / Center Medallion */}
+          <circle cx="35" cy="35" r="4" fill="#F59E0B" stroke="#D97706" strokeWidth="1" />
+          <circle cx="65" cy="35" r="4" fill="#F59E0B" stroke="#D97706" strokeWidth="1" />
+          {/* Golden Ribbon Bookmark */}
+          <path d="M50 44 L50 68 L53 64 L56 68 L56 44" fill="#F59E0B" stroke="#D97706" strokeWidth="1" />
+        </svg>
+      );
+
+    case 'paradise': // الجَنَّةُ (জান্নাত / স্বর্গ)
+      return (
+        <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {/* Heavenly radiant aura */}
+          <circle cx="50" cy="50" r="42" fill="#ECFDF5" stroke="#10B981" strokeWidth="1.5" strokeDasharray="4 3" />
+          {/* Twin Date Palms */}
+          <path d="M30 68 Q34 45 32 32" stroke="#78350F" strokeWidth="4" fill="none" />
+          <path d="M32 32 Q18 24 16 34 M32 32 Q26 16 38 18 M32 32 Q44 22 46 32" stroke="#047857" strokeWidth="3" fill="none" />
+          <circle cx="28" cy="34" r="2" fill="#F59E0B" />
+          <circle cx="34" cy="34" r="2" fill="#F59E0B" />
+          {/* Right Palm */}
+          <path d="M70 68 Q66 45 68 32" stroke="#78350F" strokeWidth="4" fill="none" />
+          <path d="M68 32 Q82 24 84 34 M68 32 Q74 16 62 18 M68 32 Q56 22 54 32" stroke="#047857" strokeWidth="3" fill="none" />
+          <circle cx="66" cy="34" r="2" fill="#F59E0B" />
+          <circle cx="72" cy="34" r="2" fill="#F59E0B" />
+          {/* Crystal clear flowing river under trees */}
+          <path d="M38 68 Q50 64 62 68 L76 90 Q50 82 24 90 Z" fill="#38BDF8" stroke="#0284C7" strokeWidth="2" />
+          <path d="M36 76 Q50 72 64 76" stroke="#FFFFFF" strokeWidth="2" fill="none" />
+          {/* Golden Crescent in Sky */}
+          <path d="M52 14 C48 14 45 17 45 21 C45 25 48 28 52 28 C50 28 47 25 47 21 C47 17 50 14 52 14 Z" fill="#F59E0B" />
+          <circle cx="55" cy="18" r="1.5" fill="#F59E0B" />
+        </svg>
+      );
     default:
       return (
         <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

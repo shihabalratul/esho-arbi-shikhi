@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users,
   Plus,
@@ -19,6 +19,8 @@ import {
   Share2,
   AlertCircle,
   Info,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useRoomSocket } from '../hooks/useRoomSocket';
 import { CardSelectorModal } from './CardSelectorModal';
@@ -49,6 +51,7 @@ export const CollaborativeRoom: React.FC = () => {
     putCard,
     syncRoom,
     flipCard,
+    revealPassageSentence,
     clearCard,
     sendMessage,
     leaveRoom,
@@ -65,6 +68,20 @@ export const CollaborativeRoom: React.FC = () => {
   const [cardShake, setCardShake] = useState(false);
   const [isSyncingRoom, setIsSyncingRoom] = useState(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
+
+  // Scroll containers for the front (passage) and back (details) of the card
+  const frontScrollRef = useRef<HTMLDivElement>(null);
+  const backScrollRef = useRef<HTMLDivElement>(null);
+
+  // Reset scroll positions whenever a new card is put or flipped
+  useEffect(() => {
+    if (frontScrollRef.current) {
+      frontScrollRef.current.scrollTop = 0;
+    }
+    if (backScrollRef.current) {
+      backScrollRef.current.scrollTop = 0;
+    }
+  }, [roomState?.activeCard?.cardId, roomState?.activeCard?.putAt, roomState?.activeCard?.isFlipped]);
 
   const handleSyncRoom = async () => {
     setIsSyncingRoom(true);
@@ -610,7 +627,13 @@ export const CollaborativeRoom: React.FC = () => {
                   }`}
                 >
                   {/* FRONT OF THE CARD (QUESTION SIDE) */}
-                  <div className="absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-4 sm:p-7 flex flex-col justify-between backface-hidden bg-white text-stone-900 border border-stone-300 shadow-xl">
+                  <div
+                    className={`absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-4 sm:p-7 flex flex-col justify-between backface-hidden bg-white text-stone-900 border border-stone-300 shadow-xl transition-all ${
+                      roomState.activeCard.isFlipped
+                        ? 'pointer-events-none z-0'
+                        : 'pointer-events-auto z-10'
+                    }`}
+                  >
                     {/* Top Row */}
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold px-2.5 sm:px-3 py-1 rounded-full bg-stone-100 text-stone-700 font-bengali border border-stone-200">
@@ -632,76 +655,218 @@ export const CollaborativeRoom: React.FC = () => {
                     </div>
 
                     {/* Question Content */}
-                    <div className="my-auto flex flex-col items-center justify-center text-center px-2 sm:px-4 py-2">
-                      {roomState.activeCard.mode === 'photo' && (
-                        <div className="flex flex-col items-center gap-2.5 sm:gap-3">
-                          <div className="w-36 h-36 xs:w-44 xs:h-44 sm:w-56 sm:h-56 rounded-2xl sm:rounded-3xl bg-amber-50/70 border border-amber-200/90 flex items-center justify-center p-3 sm:p-5 shadow-sm">
-                            <ItemIllustration
-                              name={activeCardItem.illustrationKey || 'pen'}
-                              className="w-full h-full drop-shadow-md"
-                            />
+                    <div className="my-auto flex flex-col items-center justify-center text-center px-2 sm:px-4 py-2 w-full">
+                      {(activeCardItem.itemType === 'passage' || (activeCardItem.passageSentences && activeCardItem.passageSentences.length > 0)) ? (
+                        <div className="w-full flex flex-col my-auto max-h-[360px] sm:max-h-[420px] overflow-hidden">
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-100 shrink-0">
+                            <div className="text-left">
+                              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md font-bengali">
+                                পাঠের অনুচ্ছেদ (Passage)
+                              </span>
+                              <h4 className="text-sm sm:text-base font-bold text-stone-900 font-bengali mt-0.5">
+                                {activeCardItem.passageTitle || 'অনুশীলনী পাঠ'}
+                              </h4>
+                            </div>
+                            <span className="text-[11px] font-bengali text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">
+                              {activeCardItem.passageSentences?.length || 0}টি বাক্য
+                            </span>
                           </div>
-                          <span className="inline-flex items-center gap-1 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-emerald-50 text-emerald-800 text-xs sm:text-sm font-semibold font-bengali border border-emerald-200 mt-1 sm:mt-2">
-                            <HelpCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                            ছবিটি দেখে আরবী ও বাংলা নাম বলুন
-                          </span>
-                        </div>
-                      )}
 
-                      {roomState.activeCard.mode === 'bn_to_ar' && (
-                        <div className="flex flex-col items-center gap-2.5 sm:gap-3">
-                          <span className="text-xs uppercase tracking-wider text-stone-500 font-semibold px-3 py-1 bg-stone-100 rounded-full font-bengali">
-                            বাংলা অর্থ দেখে বলুন
-                          </span>
-                          <h3 className="text-2xl sm:text-4xl font-bold text-stone-900 font-bengali px-2">
-                            {activeCardItem.bangla}
-                          </h3>
-                          {activeCardItem.hasIllustration && (
-                            <div className="w-16 h-16 sm:w-20 sm:h-20 opacity-30 mt-1 sm:mt-2">
-                              <ItemIllustration
-                                name={activeCardItem.illustrationKey || 'pen'}
-                                className="w-full h-full"
-                              />
+                          {/* Scrollable Sentences */}
+                          <div
+                            ref={frontScrollRef}
+                            className={`space-y-2 pr-1 text-right scrollbar-thin scrollbar-thumb-stone-200 py-1 flex-1 overscroll-contain ${
+                              roomState.activeCard.isFlipped
+                                ? 'overflow-hidden pointer-events-none'
+                                : 'overflow-y-auto pointer-events-auto'
+                            }`}
+                          >
+                            {activeCardItem.passageSentences?.map((sent, sIdx) => {
+                              const isRevealed = (roomState.activeCard?.revealedSentenceIndices || []).includes(sIdx);
+                              return (
+                                <div
+                                  key={sIdx}
+                                  className={`p-2.5 sm:p-3 rounded-2xl border transition-all ${
+                                    isRevealed
+                                      ? 'bg-emerald-50/90 border-emerald-300 shadow-xs'
+                                      : 'bg-stone-50/90 border-stone-200 hover:border-stone-300'
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-2 flex-row-reverse">
+                                    <div className="flex items-center gap-1.5 flex-row-reverse">
+                                      <span className="text-base sm:text-xl font-bold font-arabic text-emerald-950 dir-rtl leading-relaxed">
+                                        {sent.arabic}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          speakArabic(sent.arabic);
+                                        }}
+                                        className="p-1.5 rounded-full bg-stone-200/80 hover:bg-emerald-100 text-emerald-800 transition shrink-0 min-w-[30px] min-h-[30px] flex items-center justify-center"
+                                        title="আরবী উচ্চারণ শুনুন"
+                                      >
+                                        <Volume2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+
+                                    {/* Action button: owner can click to reveal meaning */}
+                                    {isMyCard ? (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          revealPassageSentence(sIdx);
+                                        }}
+                                        className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold font-bengali flex items-center gap-1 transition shadow-xs shrink-0 min-h-[32px] ${
+                                          isRevealed
+                                            ? 'bg-stone-200 hover:bg-stone-300 text-stone-700'
+                                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                        }`}
+                                        title={isRevealed ? 'অর্থ পুনরায় গোপন করুন' : 'অর্থ উন্মোচন করুন'}
+                                      >
+                                        {isRevealed ? (
+                                          <>
+                                            <EyeOff className="w-3 h-3" />
+                                            <span>গোপন</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Eye className="w-3.5 h-3.5" />
+                                            <span>অর্থ উন্মোচন</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    ) : (
+                                      !isRevealed && (
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-bengali text-stone-500 bg-stone-200/70 px-2 py-1 rounded-lg shrink-0">
+                                          <Lock className="w-3 h-3 text-stone-400" />
+                                          গোপন
+                                        </span>
+                                      )
+                                    )}
+                                  </div>
+
+                                  {/* Revealed Bangla Translation */}
+                                  {isRevealed && (
+                                    <div className="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-between text-left animate-in fade-in duration-200">
+                                      <div className="text-xs sm:text-sm font-semibold font-bengali text-emerald-950">
+                                        {sent.bangla}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          speakBangla(sent.bangla);
+                                        }}
+                                        className="p-1 text-emerald-700 hover:text-emerald-900 ml-2 shrink-0 min-w-[28px] min-h-[28px] flex items-center justify-center"
+                                        title="বাংলা উচ্চারণ শুনুন"
+                                      >
+                                        <Volume2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="pt-2 text-[11px] text-stone-500 font-bengali text-center shrink-0">
+                            {isMyCard ? (
+                              <span className="text-emerald-700 font-semibold">
+                                বাক্যের 'অর্থ উন্মোচন' বাটনে চাপুন অথবা সম্পূর্ণ অনুবাদের জন্য কার্ড উল্টান
+                              </span>
+                            ) : (
+                              <span>কার্ড প্রদানকারী ({roomState.activeCard.putByUsername}) বাক্যের অর্থ উন্মোচন করবেন</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {roomState.activeCard.mode === 'photo' && (
+                            <div className="flex flex-col items-center gap-2.5 sm:gap-3">
+                              <div className="w-36 h-36 xs:w-44 xs:h-44 sm:w-56 sm:h-56 rounded-2xl sm:rounded-3xl bg-amber-50/70 border border-amber-200/90 flex items-center justify-center p-3 sm:p-5 shadow-sm">
+                                <ItemIllustration
+                                  name={activeCardItem.illustrationKey || 'pen'}
+                                  className="w-full h-full drop-shadow-md"
+                                />
+                              </div>
+                              <span className="inline-flex items-center gap-1 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-emerald-50 text-emerald-800 text-xs sm:text-sm font-semibold font-bengali border border-emerald-200 mt-1 sm:mt-2">
+                                <HelpCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                                ছবিটি দেখে আরবী ও বাংলা নাম বলুন
+                              </span>
                             </div>
                           )}
-                          <p className="text-xs text-stone-400 font-bengali mt-1 sm:mt-2">
-                            এর সঠিক আরবী শব্দটি মনে করুন
-                          </p>
-                        </div>
-                      )}
 
-                      {roomState.activeCard.mode === 'ar_to_bn' && (
-                        <div className="flex flex-col items-center gap-2 sm:gap-3">
-                          <span className="text-xs uppercase tracking-wider text-amber-700 font-semibold px-3 py-1 bg-amber-50 rounded-full font-bengali">
-                            الكلمة العربية
-                          </span>
-                          <h2 className="text-3xl xs:text-4xl sm:text-5xl font-bold text-emerald-950 font-arabic dir-rtl leading-relaxed my-1 sm:my-2 px-2">
-                            {activeCardItem.arabic}
-                          </h2>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              speakArabic(activeCardItem.arabicClean);
-                            }}
-                            className="p-2 sm:p-2.5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition min-w-[38px] min-h-[38px] flex items-center justify-center"
-                            title="আরবী উচ্চারণ শুনুন"
-                          >
-                            <Volume2 className="w-4 h-4" />
-                          </button>
-                          <p className="text-xs text-stone-400 mt-1 sm:mt-2 font-bengali">
-                            বাংলা অর্থ মনে করুন
-                          </p>
-                        </div>
+                          {roomState.activeCard.mode === 'bn_to_ar' && (
+                            <div className="flex flex-col items-center gap-2.5 sm:gap-3">
+                              <span className="text-xs uppercase tracking-wider text-stone-500 font-semibold px-3 py-1 bg-stone-100 rounded-full font-bengali">
+                                বাংলা অর্থ দেখে বলুন
+                              </span>
+                              <h3 className="text-2xl sm:text-4xl font-bold text-stone-900 font-bengali px-2">
+                                {activeCardItem.bangla}
+                              </h3>
+                              {activeCardItem.hasIllustration && (
+                                <div className="w-16 h-16 sm:w-20 sm:h-20 opacity-30 mt-1 sm:mt-2">
+                                  <ItemIllustration
+                                    name={activeCardItem.illustrationKey || 'pen'}
+                                    className="w-full h-full"
+                                  />
+                                </div>
+                              )}
+                              <p className="text-xs text-stone-400 font-bengali mt-1 sm:mt-2">
+                                এর সঠিক আরবী শব্দটি মনে করুন
+                              </p>
+                            </div>
+                          )}
+
+                          {roomState.activeCard.mode === 'ar_to_bn' && (
+                            <div className="flex flex-col items-center gap-2 sm:gap-3">
+                              <span className="text-xs uppercase tracking-wider text-amber-700 font-semibold px-3 py-1 bg-amber-50 rounded-full font-bengali">
+                                الكلمة العربية
+                              </span>
+                              <h2 className="text-3xl xs:text-4xl sm:text-5xl font-bold text-emerald-950 font-arabic dir-rtl leading-relaxed my-1 sm:my-2 px-2">
+                                {activeCardItem.arabic}
+                              </h2>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  speakArabic(activeCardItem.arabicClean);
+                                }}
+                                className="p-2 sm:p-2.5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition min-w-[38px] min-h-[38px] flex items-center justify-center"
+                                title="আরবী উচ্চারণ শুনুন"
+                              >
+                                <Volume2 className="w-4 h-4" />
+                              </button>
+                              <p className="text-xs text-stone-400 mt-1 sm:mt-2 font-bengali">
+                                বাংলা অর্থ মনে করুন
+                              </p>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
                     {/* Bottom Hint */}
                     <div className="text-center pt-2.5 sm:pt-3 border-t border-stone-200 text-xs font-bengali text-stone-400">
                       {isMyCard ? (
-                        <span className="text-emerald-700 font-semibold">
-                          কার্ডটিতে চাপ দিয়ে উত্তর প্রকাশ করুন
-                        </span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-emerald-700 font-semibold">
+                            কার্ডটিতে চাপ দিয়ে উত্তর প্রকাশ করুন
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              flipCard();
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold font-bengali flex items-center gap-1 transition shadow-xs shrink-0"
+                          >
+                            <RotateCw className="w-3 h-3" />
+                            <span>কার্ড উল্টান</span>
+                          </button>
+                        </div>
                       ) : (
                         <span>প্রদানকারী উল্টালে উত্তর দেখতে পাবেন</span>
                       )}
@@ -709,7 +874,13 @@ export const CollaborativeRoom: React.FC = () => {
                   </div>
 
                   {/* BACK OF THE CARD (RESULT & DETAILS) */}
-                  <div className="absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 flex flex-col justify-between rotate-y-180 backface-hidden bg-gradient-to-b from-stone-900 to-stone-950 text-stone-100 border border-stone-800 shadow-2xl">
+                  <div
+                    className={`absolute inset-0 w-full h-full rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 flex flex-col justify-between rotate-y-180 backface-hidden bg-gradient-to-b from-stone-900 to-stone-950 text-stone-100 border border-stone-800 shadow-2xl transition-all ${
+                      roomState.activeCard.isFlipped
+                        ? 'pointer-events-auto z-10'
+                        : 'pointer-events-none z-0'
+                    }`}
+                  >
                     {/* Top Bar */}
                     <div className="flex items-center justify-between pb-2 border-b border-stone-800 shrink-0">
                       <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bengali border border-emerald-500/30">
@@ -721,7 +892,14 @@ export const CollaborativeRoom: React.FC = () => {
                     </div>
 
                     {/* Scrollable Rich Details */}
-                    <div className="flex-1 overflow-y-auto px-1 sm:px-2 py-2 space-y-2.5 sm:space-y-3 scrollbar-thin scrollbar-thumb-stone-700">
+                    <div
+                      ref={backScrollRef}
+                      className={`flex-1 px-1 sm:px-2 py-2 space-y-2.5 sm:space-y-3 scrollbar-thin scrollbar-thumb-stone-700 overscroll-contain ${
+                        roomState.activeCard.isFlipped
+                          ? 'overflow-y-auto pointer-events-auto'
+                          : 'overflow-hidden pointer-events-none'
+                      }`}
+                    >
                       {/* Identity */}
                       <div className="flex items-center justify-center gap-2.5 sm:gap-3 pt-1">
                         {activeCardItem.hasIllustration && (
@@ -809,6 +987,49 @@ export const CollaborativeRoom: React.FC = () => {
                               অর্থ: {activeCardItem.exampleSentenceBn}
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* Passage Sentences Breakdown */}
+                      {activeCardItem.passageSentences && activeCardItem.passageSentences.length > 0 && (
+                        <div className="w-full bg-stone-900/95 rounded-2xl p-3 sm:p-4 border border-amber-500/30 text-left">
+                          <div className="text-xs sm:text-sm font-bold text-amber-400 font-bengali mb-2 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5" />
+                              অনুচ্ছেদের সকল বাক্য ও পূর্ণাঙ্গ অনুবাদ:
+                            </span>
+                            <span className="text-[10px] text-stone-400 font-normal">
+                              {activeCardItem.passageSentences.length}টি বাক্য
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {activeCardItem.passageSentences.map((sent, sIdx) => (
+                              <div
+                                key={sIdx}
+                                className="bg-stone-800/80 rounded-xl p-2.5 sm:p-3 border border-stone-700/60 flex items-center justify-between gap-2.5"
+                              >
+                                <div className="flex-1 text-right">
+                                  <div className="text-base sm:text-xl font-bold text-amber-200 font-arabic dir-rtl leading-snug">
+                                    {sent.arabic}
+                                  </div>
+                                  <div className="text-xs sm:text-sm text-emerald-200 font-bengali text-left mt-1">
+                                    {sent.bangla}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    speakArabic(sent.arabic);
+                                  }}
+                                  className="p-1.5 rounded-full bg-emerald-800/70 hover:bg-emerald-600 text-white transition shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center"
+                                  title="আরবী শুনুন"
+                                >
+                                  <Volume2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
 

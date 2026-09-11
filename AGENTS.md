@@ -33,6 +33,7 @@
     ├── index.css              # Tailwind CSS imports & animations
     ├── data/
     │   ├── chapters.ts        # Lesson and chapter index definitions
+    │   ├── sentencesData.ts   # Textbook & derived sentences database (book sentences vs new practice sentences)
     │   └── vocabulary.ts      # Structured vocabulary item database (Arabic, Bangla, transliteration, sentences, illustrations)
     ├── components/
     │   ├── CardSelectorModal.tsx   # Modal for selecting a specific card to put on the room table
@@ -40,6 +41,7 @@
     │   ├── Flashcard.tsx           # Single-player flashcard mode
     │   ├── PhotoCardGrid.tsx       # Visual photo flashcard grid
     │   ├── Quiz.tsx                # Practice quizzes
+    │   ├── SentenceSection.tsx     # Dedicated sentences section (book sentences vs new derived sentences)
     │   ├── UsernameModal.tsx       # Quick name & avatar color picker (no login required)
     │   ├── VocabularyTable.tsx     # Full vocabulary list & search table
     │   └── illustrations.tsx       # Vector illustrations for vocabulary items
@@ -75,3 +77,14 @@
 ### 3. Textbook Vocabulary Data Integrity
 - All vocabulary items, transliterations, Bangla translations, example phrases, and categories are strictly derived from the authentic "এসো আরবী শিখি" textbook curriculum.
 - No dummy or mock placeholder datasets exist; all items are fully searchable, audibly playable via Web Speech API, and usable in solo and multiplayer study modes.
+
+### 4. Sentences Section Structure & Vocabulary Mapping
+- **Division 1: কিতাবের মূল বাক্য (Book Sentences)**: Authentic sentences directly from the lessons and units of "এসো আরবী শিখি", tagged with lesson name, grammar structure notes, and full Tashkeel diacritics.
+- **Division 2: নতুন অনুশীলনী বাক্য (Derived Sentences)**: Practical new sentences built using the vocabulary and grammatical rules taught across the book. Each sentence contains a detailed `bookWordsUsed` breakdown mapping back to the individual words learned in the book.
+- **Interactive Practice**: Features audio pronunciation (Web Speech API), one-click test mode (hide/show translations), category pill filters, and live search.
+
+### 5. 3D Flip Card Scroll Isolation Engine
+- **Active Face Event Guarding**: The active side is strictly elevated to `z-10` with `pointer-events-auto`, while the hidden opposite face is demoted to `z-0` with `pointer-events-none`.
+- **Dynamic Scroll Overflow**: Internal scrollable containers dynamically toggle between `overflow-y-auto pointer-events-auto` when active and `overflow-hidden pointer-events-none` when inactive, completely preventing hidden-face scroll capture or touch event hijacking.
+- **Scroll Position Reset**: Both front and back scroll views automatically reset their `scrollTop` to 0 whenever a new card is placed or flipped.
+- **Overscroll Containment**: Uses `overscroll-contain` so card inner scrolling never causes background rubber-banding or mobile pull-to-refresh conflicts.

@@ -17,6 +17,7 @@ import {
   Volume2,
   X,
   Users,
+  GraduationCap,
 } from 'lucide-react';
 import { chapters, bookUnits } from './data/chapters';
 import { vocabularyItems } from './data/vocabulary';
@@ -26,6 +27,7 @@ import { Quiz } from './components/Quiz';
 import { PhotoCardGrid } from './components/PhotoCardGrid';
 import { VocabularyTable } from './components/VocabularyTable';
 import { CollaborativeRoom } from './components/CollaborativeRoom';
+import { SentenceSection } from './components/SentenceSection';
 import { ItemIllustration } from './components/illustrations';
 import { speakArabic, speakBangla } from './utils/audio';
 
@@ -77,6 +79,13 @@ export default function App() {
         label: 'আরবী ➔ বাংলা',
         shortLabel: 'আরবী ➔ বাংলা',
         icon: ArrowLeftRight,
+      },
+      {
+        id: 'sentences' as StudyMode,
+        key: 'sentences',
+        label: 'বাক্য ও বাক্যগঠন',
+        shortLabel: 'বাক্য',
+        icon: GraduationCap,
       },
       {
         id: 'photo_gallery' as StudyMode,
@@ -206,7 +215,8 @@ export default function App() {
         const matchesAr = item.arabic.includes(query) || item.arabicClean.includes(query);
         const matchesEn = item.english.toLowerCase().includes(query);
         const matchesTranslit = item.banglaTranslit?.toLowerCase().includes(query);
-        if (!matchesBn && !matchesAr && !matchesEn && !matchesTranslit) {
+        const matchesPassage = item.passageTitle?.toLowerCase().includes(query);
+        if (!matchesBn && !matchesAr && !matchesEn && !matchesTranslit && !matchesPassage) {
           return false;
         }
       }
@@ -368,7 +378,7 @@ export default function App() {
       </header>
 
       {/* Book Chapter & Lesson Selection Hierarchy (Shown in study modes) */}
-      {studyMode !== 'room' && (
+      {studyMode !== 'room' && studyMode !== 'sentences' && (
         <>
           <nav className="bg-stone-100/90 border-b border-stone-200/90 px-3 sm:px-6 py-2.5">
             <div className="max-w-7xl mx-auto space-y-2">
@@ -783,7 +793,12 @@ export default function App() {
           </div>
         )}
 
-        {/* 5. COLLABORATIVE LIVE ROOM MODE */}
+        {/* 5. SENTENCES SECTION (বাক্য ও বাক্যগঠন) */}
+        {studyMode === 'sentences' && (
+          <SentenceSection />
+        )}
+
+        {/* 6. COLLABORATIVE LIVE ROOM MODE */}
         {studyMode === 'room' && (
           <CollaborativeRoom />
         )}
@@ -982,7 +997,21 @@ export default function App() {
             <span className="text-[11px] font-bengali leading-tight">কার্ড</span>
           </button>
 
-          {/* 2. Photo Gallery */}
+          {/* 2. Sentences (বাক্য ও বাক্যগঠন) */}
+          <button
+            id="mobile-nav-sentences"
+            onClick={() => setStudyMode('sentences')}
+            className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition min-h-[48px] active:scale-95 ${
+              studyMode === 'sentences'
+                ? 'text-emerald-900 font-bold bg-emerald-50'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <GraduationCap className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[11px] font-bengali leading-tight">বাক্য</span>
+          </button>
+
+          {/* 3. Photo Gallery */}
           <button
             id="mobile-nav-gallery"
             onClick={() => setStudyMode('photo_gallery')}

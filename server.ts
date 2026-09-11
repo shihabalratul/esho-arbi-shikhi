@@ -20,6 +20,7 @@ interface PlacedCard {
   isFlipped: boolean;
   flippedAt?: number;
   mode: 'photo' | 'bn_to_ar' | 'ar_to_bn';
+  revealedSentenceIndices?: number[];
 }
 
 interface RoomMessage {
@@ -343,6 +344,7 @@ async function startServer() {
             putAt: Date.now(),
             isFlipped: false,
             mode: mode || 'photo',
+            revealedSentenceIndices: [],
           };
 
           const sysMsg: RoomMessage = {
@@ -375,6 +377,7 @@ async function startServer() {
             putAt: Date.now(),
             isFlipped: false,
             mode: mode || 'photo',
+            revealedSentenceIndices: [],
           };
 
           const sysMsg: RoomMessage = {
@@ -386,6 +389,42 @@ async function startServer() {
             timestamp: Date.now(),
           };
           room.messages.push(sysMsg);
+
+          broadcastToRoom(room, {
+            type: 'ROOM_STATE',
+            state: getRoomStateDTO(room),
+          });
+          return;
+        }
+
+        // 2.5 REVEAL PASSAGE SENTENCE (Toggle sentence translation for passage card by owner)
+        if (type === 'REVEAL_PASSAGE_SENTENCE') {
+          if (!room.activeCard) {
+            return;
+          }
+
+          if (room.activeCard.putByUserId !== participant.info.id) {
+            ws.send(
+              JSON.stringify({
+                type: 'ERROR',
+                code: 'NOT_AUTHORIZED_TO_REVEAL',
+                message: `শুধুমাত্র ${room.activeCard.putByUsername} যিনি কার্ডটি রেখেছেন তিনিই বাক্যের অর্থ উন্মোচন করতে পারবেন!`,
+              })
+            );
+            return;
+          }
+
+          const index = Number(msg.index);
+          if (isNaN(index) || index < 0) return;
+
+          const currentIndices = new Set(room.activeCard.revealedSentenceIndices || []);
+          if (currentIndices.has(index)) {
+            currentIndices.delete(index);
+          } else {
+            currentIndices.add(index);
+          }
+          room.activeCard.revealedSentenceIndices = Array.from(currentIndices).sort((a, b) => a - b);
+          room.version = Math.max((room.version || 0) + 1, Number(msg.version) || 0);
 
           broadcastToRoom(room, {
             type: 'ROOM_STATE',
